@@ -1,0 +1,30 @@
+# AION 反向代理。
+# 域名由环境变量 AION_DOMAIN 注入（deploy.sh 会自动设置），Caddy 自动申请并续期证书。
+# 若没有域名，只能临时用 IP + HTTP，此时手机上传输的密码和令牌是明文，务必尽快换成 HTTPS。
+
+{
+    email {$ACME_EMAIL:you@example.com}
+}
+
+{$AION_DOMAIN:localhost} {
+    encode zstd gzip
+
+    # 安全响应头
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy no-referrer
+        -Server
+    }
+
+    # WebSocket 与 REST 都走后端
+    reverse_proxy backend:8000
+
+    log {
+        output file /data/access.log {
+            roll_size 20mb
+            roll_keep 5
+        }
+    }
+}

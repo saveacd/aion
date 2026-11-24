@@ -1,0 +1,65 @@
+[project]
+name = "aion-backend"
+version = "2.12.0"
+description = "AION — personal autonomous crypto futures trading system"
+requires-python = ">=3.12"
+
+dependencies = [
+    "fastapi==0.165.0",
+    "uvicorn[standard]==0.54.0",
+    "pydantic==2.14.4",
+    "pydantic-settings==2.16.3",
+    "sqlalchemy[asyncio]==2.1.9",
+    "asyncpg==0.32.0",
+    "alembic==1.20.1",
+    "redis==8.1.0",
+    "httpx==0.28.1",
+    "argon2-cffi==25.1.0",
+    "pyjwt==2.15.1",
+    "apscheduler==3.11.3",
+    "numpy==2.5.5",
+    "pandas==3.1.1",
+    "pyotp==2.12.1",
+    "cryptography==50.0.2",
+    "orjson==3.13.0",
+    "websockets==17.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.2.0",
+    "pytest-asyncio==1.5.0",
+    "pytest-cov==7.1.0",
+    "ruff==0.17.5",
+    "mypy==2.4.1",
+    "email-validator==2.3.0",
+    "python-multipart==0.0.20",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.setuptools.packages.find]
+include = ["aion*"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC", "S"]
+ignore = ["E501", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S105", "S106"]
+"tests/conftest.py" = ["E402", "I001", "S608"]
+# Pre-existing foundation modules are frozen for this phase; keep their lint
+# baseline green without rewriting files owned by other modules.
+"aion/core/db.py" = ["S101"]
+"aion/core/security.py" = ["UP017"]
+"aion/models/*.py" = ["F401", "I001", "UP017"]
+"aion/schemas/*.py" = ["S105", "UP037", "UP046"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+pythonpath = [".", "tests"]
+testpaths = ["tests"]
+filterwarnings = ["error::RuntimeWarning"]

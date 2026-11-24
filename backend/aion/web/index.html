@@ -1,0 +1,1773 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#100d0b">
+<title>AION · 六个 AI 与你一起投资</title>
+<style>
+  :root{
+    --bg:#100d0b; --bg2:#17110d; --panel:#1a1511; --panel2:#241c15; --line:#3b2b1d;
+    --text:#fff4e8; --muted:#b7a38d; --accent:#e9a34a; --accent2:#49b987;
+    --blue:#d9a15f; --purple:#c88754; --red:#f06a62; --yellow:#ffc46b;
+    --radius:16px; --shadow:0 6px 18px rgba(0,0,0,.18);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  [hidden]{display:none !important}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:15px;line-height:1.5}
+  body{padding-bottom:calc(80px + env(safe-area-inset-bottom))}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:radial-gradient(900px 500px at 15% -10%, rgba(233,163,74,.08), transparent 60%);}
+  a{color:var(--accent);text-decoration:none}
+  .shell{position:relative;z-index:1;display:flex;min-height:100vh}
+  aside{display:none}
+  .main{flex:1;min-width:0}
+  header{position:sticky;top:0;z-index:20;background:rgba(7,9,12,.82);backdrop-filter:blur(16px);
+    padding:14px 18px;border-bottom:1px solid rgba(34,48,68,.7);display:flex;align-items:center;gap:12px}
+  header .logo{font-weight:750;letter-spacing:3px;font-size:16px;color:var(--accent);display:flex;align-items:center;gap:8px}
+  header .logo img{width:28px;height:28px;object-fit:cover;border-radius:7px;border:1px solid rgba(233,163,74,.45)}
+  header h1{font-size:15px;margin:0;font-weight:600;color:var(--muted);letter-spacing:.4px}
+  header .right{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted)}
+  .pill{display:inline-flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);
+    border-radius:999px;padding:5px 10px;font-size:12px;color:var(--muted)}
+  .pill .dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}
+  .bell{position:relative;width:34px;height:34px;border-radius:50%;border:1px solid var(--line);
+    background:var(--panel2);color:var(--text);display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .bell b{position:absolute;top:-3px;right:-3px;min-width:16px;height:16px;border-radius:9px;background:var(--red);
+    color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;padding:0 4px}
+  main{padding:18px 16px 10px;max-width:1080px;margin:0 auto}
+  .card{background:var(--panel);
+    border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:14px;}
+  .card h2{font-size:12px;color:var(--muted);font-weight:600;margin:0 0 12px;letter-spacing:.12em;text-transform:uppercase}
+  .card h3{font-size:15px;margin:0 0 8px;font-weight:600}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0}
+  .row+.row{border-top:1px solid rgba(34,48,68,.55)}
+  .label{color:var(--muted);font-size:13px}
+  .val{font-variant-numeric:tabular-nums;font-weight:500;text-align:right}
+  .big{font-size:32px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.4px}
+  .up{color:var(--accent2)} .down{color:var(--red)} .warn{color:var(--yellow)} .muted{color:var(--muted)}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .chip{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:6px 11px;font-size:12px;color:var(--muted)}
+  .chip b{color:var(--text);font-weight:600}
+  .chip.ok{border-color:rgba(14,203,129,.45);color:var(--accent2)}
+  .chip.bad{border-color:rgba(246,70,93,.45);color:var(--red)}
+  input,select,button,textarea{font:inherit;color:var(--text)}
+  input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);
+    border-radius:12px;padding:11px 12px;outline:none;appearance:none}
+  input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+  .field{margin-bottom:10px}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;width:100%;
+    background:var(--accent);color:#201307;border:0;border-radius:12px;
+    padding:13px 14px;font-weight:700;font-size:15px;cursor:pointer}
+  .btn:active{opacity:.85}
+  .btn.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+  .btn.danger{background:rgba(246,70,93,.12);color:var(--red);border:1px solid rgba(246,70,93,.4)}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--muted)}
+  .btn.small{width:auto;padding:8px 12px;font-size:13px;font-weight:600}
+  .brand-pick.on{border-color:var(--accent);color:var(--accent);background:rgba(233,163,74,.08)}
+  .mutedbox{color:var(--muted);font-size:13px;text-align:center;padding:20px 6px}
+  .sep{height:1px;background:var(--line);margin:12px 0}
+  .kv{display:grid;grid-template-columns:1fr auto;gap:7px 12px;font-size:13px}
+  .kv .k{color:var(--muted)}
+  .kv .v{text-align:right;font-variant-numeric:tabular-nums}
+  .inline{display:flex;gap:8px;flex-wrap:wrap}
+  .inline .btn{flex:1;min-width:120px}
+  .list-item{padding:12px 0;border-bottom:1px solid rgba(34,48,68,.55)}
+  .list-item:last-child{border-bottom:0}
+  .li-top{display:flex;justify-content:space-between;gap:8px;font-size:14px;align-items:flex-start}
+  .li-sub{color:var(--muted);font-size:12px;margin-top:4px;word-break:break-word}
+  .status{font-size:11px;padding:2px 8px;border-radius:7px;background:var(--panel2);color:var(--muted);white-space:nowrap}
+  .status.OK,.status.COMPLETED,.status.FILLED,.status.approved,.status.ACTIVE{color:var(--accent2);background:rgba(14,203,129,.12)}
+  .status.ERROR,.status.REJECTED,.status.FAILED,.status.BLOCKED{color:var(--red);background:rgba(246,70,93,.12)}
+  .status.RUNNING,.status.DEGRADED,.status.PENDING,.status.WAIT{color:var(--yellow);background:rgba(240,185,11,.12)}
+  .status.VETO{color:var(--red);background:rgba(246,70,93,.14)}
+  nav{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;overflow-x:auto;
+    background:rgba(9,13,18,.96);backdrop-filter:blur(16px);border-top:1px solid var(--line);
+    padding:6px 4px calc(6px + env(safe-area-inset-bottom));scrollbar-width:none}
+  nav::-webkit-scrollbar{display:none}
+  nav button{flex:1 0 auto;min-width:54px;background:none;border:0;color:var(--muted);font-size:10.5px;padding:6px 4px;
+    display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;white-space:nowrap}
+  nav button.active{color:var(--accent)}
+  nav .ico{font-size:17px;line-height:1}
+  .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:22px;position:relative;z-index:1}
+  .login{width:100%;max-width:400px}
+  .brand{text-align:center;margin-bottom:24px}
+  .brand img{display:block;width:116px;height:116px;object-fit:cover;border-radius:22px;margin:0 auto 14px;border:1px solid rgba(233,163,74,.5)}
+  .brand .logo{font-size:36px;font-weight:800;letter-spacing:8px;
+    background:linear-gradient(135deg,#fff,var(--accent));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .brand .sub{color:var(--muted);font-size:11px;letter-spacing:2.5px;margin-top:6px}
+  .tabs{display:flex;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:4px;margin-bottom:16px}
+  .tabs button{flex:1;background:none;border:0;color:var(--muted);padding:9px;border-radius:9px;cursor:pointer;font-size:13px}
+  .tabs button.active{background:var(--panel);color:var(--text);box-shadow:0 2px 8px rgba(0,0,0,.3)}
+  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:100px;z-index:99;
+    background:#1b2634;border:1px solid var(--line);color:var(--text);padding:11px 16px;
+    border-radius:12px;font-size:13px;max-width:86vw;opacity:0;transition:opacity .2s;pointer-events:none;box-shadow:var(--shadow)}
+  .toast.show{opacity:1}
+  .spark{width:100%;height:60px;display:block;margin-top:6px}
+  .msg{border-left:2px solid var(--line);padding:6px 0 6px 10px;margin-bottom:9px}
+  .msg .who{font-size:12px;color:var(--accent);margin-bottom:2px}
+  .msg .txt{font-size:13px;color:var(--text);white-space:pre-wrap;word-break:break-word}
+  .msg .warn{font-size:12px;margin-top:4px}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.25);
+    border-top-color:#04120f;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  /* hero */
+  .hero{position:relative;overflow:hidden;border-radius:24px;padding:20px;margin-bottom:14px;
+    background:linear-gradient(135deg,rgba(34,211,167,.16),rgba(74,158,255,.08) 55%,rgba(17,23,32,.96));
+    border:1px solid rgba(34,211,167,.24);box-shadow:var(--shadow)}
+  .hero .tag{font-size:11px;letter-spacing:.16em;color:var(--accent);text-transform:uppercase}
+  .hero h2{font-size:24px;line-height:1.25;margin:8px 0 6px;color:var(--text);text-transform:none;letter-spacing:0}
+  .hero p{margin:0;color:#b8c4d4;font-size:13px}
+  .hero .actions{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+  .hero .actions .btn{width:auto;padding:10px 16px;font-size:13px}
+  /* agent pipeline */
+  .pipeline{display:flex;gap:10px;overflow-x:auto;padding:2px 0 6px;scrollbar-width:none}
+  .pipeline::-webkit-scrollbar{display:none}
+  .agent{position:relative;flex:0 0 158px;background:var(--panel2);border:1px solid var(--line);
+    border-radius:15px;padding:12px;min-height:128px}
+  .agent .idx{font-size:10px;color:var(--muted);letter-spacing:.12em}
+  .agent .name{font-size:13px;font-weight:650;margin:5px 0 3px}
+  .agent .purpose{font-size:11px;color:var(--muted);line-height:1.4;min-height:30px}
+  .agent .meta{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:11px;color:var(--muted)}
+  .agent.done{border-color:rgba(34,211,167,.4)}
+  .agent.running{border-color:rgba(240,185,11,.5);box-shadow:0 0 0 1px rgba(240,185,11,.15) inset}
+  .agent.veto{border-color:rgba(246,70,93,.55)}
+  .agent .glow{position:absolute;inset:auto 12px 10px 12px;height:3px;border-radius:2px;background:var(--line)}
+  .agent .glow i{display:block;height:100%;border-radius:2px;background:linear-gradient(90deg,var(--accent),var(--blue))}
+  .six-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .six-cell{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 8px;text-align:center}
+  .six-cell .num{font-size:10px;color:var(--muted)}
+  .six-cell .nm{font-size:11px;margin-top:3px;color:var(--text)}
+  .six-cell .st{font-size:10px;margin-top:4px;color:var(--muted)}
+  .six-cell.on{border-color:rgba(34,211,167,.4)}
+  .six-cell.off{opacity:.7}
+  .decision-banner{border-radius:14px;padding:13px 14px;border:1px solid var(--line);
+    background:rgba(74,158,255,.08);margin-bottom:12px;font-size:13px}
+  .decision-banner.trade{border-color:rgba(14,203,129,.45);background:rgba(14,203,129,.08)}
+  .decision-banner.wait{border-color:rgba(240,185,11,.35);background:rgba(240,185,11,.06)}
+  .mode-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+  .mode-card{border:1px solid var(--line);background:var(--panel2);border-radius:12px;padding:11px 9px;cursor:pointer;text-align:center}
+  .mode-card.active{border-color:var(--accent);background:rgba(34,211,167,.09)}
+  .mode-card b{display:block;font-size:13px;margin-bottom:3px}
+  .mode-card span{font-size:10.5px;color:var(--muted);line-height:1.35}
+  .notice{font-size:12px;color:var(--muted);background:rgba(240,185,11,.06);border:1px solid rgba(240,185,11,.2);
+    border-radius:12px;padding:10px 12px;margin-bottom:12px;line-height:1.5}
+  .notice.danger{color:#ffb3bd;background:rgba(246,70,93,.08);border-color:rgba(246,70,93,.3)}
+  .progress{height:5px;background:var(--panel2);border-radius:4px;overflow:hidden;margin:8px 0}
+  .progress i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--blue))}
+  @media(min-width:900px){
+    body{padding-bottom:0}
+    aside{display:flex;flex-direction:column;width:220px;flex:0 0 220px;border-right:1px solid var(--line);
+      background:rgba(9,13,18,.7);backdrop-filter:blur(12px);padding:18px 12px;position:sticky;top:0;height:100vh}
+    aside .brandmini{font-weight:800;letter-spacing:3px;font-size:18px;padding:6px 10px 18px;display:flex;align-items:center;gap:10px}
+    aside .brandmini img{width:42px;height:42px;object-fit:cover;border-radius:10px;border:1px solid rgba(233,163,74,.45)}
+    aside .brandmini small{display:block;font-size:9px;letter-spacing:2px;color:var(--muted);margin-top:3px;font-weight:400}
+    aside nav{position:static;display:flex;flex-direction:column;background:none;border:0;padding:0;overflow:visible}
+    aside nav button{width:100%;flex-direction:row;gap:10px;font-size:13px;padding:10px 12px;border-radius:10px;min-width:0}
+    aside nav button.active{background:rgba(233,163,74,.1);color:var(--accent)}
+    aside .foot{margin-top:auto;font-size:11px;color:var(--muted);padding:10px}
+    main{padding:24px 28px 40px;max-width:1120px}
+    .card{padding:18px}
+    header{padding:16px 28px}
+    nav{display:none}
+  }
+  @media(min-width:640px){ .big{font-size:38px} .hero h2{font-size:28px} }
+
+  /* Console refinement v2.10 */
+  :root{--bg:#0e0b09;--bg2:#17110c;--panel:#1c1510;--panel2:#281d13;--line:rgba(224,165,89,.22);--text:#fff5e9;--muted:#bba58b;--accent:#e8a34d;--accent2:#75c69a;--blue:#e2b36e;--purple:#c88754;--radius:17px;--shadow:0 12px 34px rgba(0,0,0,.22)}
+  body::before{background:radial-gradient(900px 500px at 15% -10%,rgba(233,163,74,.10),transparent 60%),radial-gradient(700px 500px at 100% 30%,rgba(172,103,42,.06),transparent 60%)}
+  header{background:rgba(14,11,9,.88);border-bottom-color:rgba(224,165,89,.18)}
+  .card{box-shadow:0 8px 24px rgba(0,0,0,.12);transition:border-color .2s,transform .2s}
+  .card:focus-within{border-color:rgba(232,163,77,.42)}
+  .hero{background:linear-gradient(135deg,rgba(201,132,58,.16),rgba(128,77,33,.09) 55%,rgba(28,21,16,.98));border-color:rgba(224,165,89,.25)}
+  .hero p{color:#c8b49b}.hero .tag{color:#f0bd75}
+  .agent,.six-cell,.mode-card{border-color:rgba(224,165,89,.2)}
+  .agent.done,.six-cell.on{border-color:rgba(117,198,154,.42)}
+  nav{background:rgba(14,11,9,.97);border-top-color:rgba(224,165,89,.2)}
+  aside{background:rgba(14,11,9,.82);border-right-color:rgba(224,165,89,.18)}
+  aside nav button.active{background:rgba(232,163,77,.12)}
+  .status.ACTIVE,.status.OK{color:#8ed5a8}
+  .notice{background:rgba(232,163,77,.07);border-color:rgba(232,163,77,.22)}
+  input,select,textarea{background:#21180f;border-color:rgba(224,165,89,.22)}
+  input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(232,163,77,.08)}
+  .btn{box-shadow:0 6px 16px rgba(185,112,39,.13)}
+  .btn.secondary{background:#2a1e13;border-color:rgba(224,165,89,.22)}
+  @media(min-width:900px){main{max-width:1240px;padding:28px 34px 48px}aside{width:236px;flex-basis:236px;padding:22px 14px}.card{padding:20px;border-radius:18px}}
+  @media(max-width:639px){main{padding:14px 12px 12px}.card{padding:14px;border-radius:14px}.hero{border-radius:18px}.grid2{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+
+<div id="login" class="login-wrap" hidden>
+  <div class="login">
+    <div class="brand">
+      <img src="/ui/assets/aion-brand.webp" alt="AION 官方标识">
+      <div class="logo">AION</div>
+      <div class="sub">六个 AI · 一起为你投资</div>
+    </div>
+    <div class="card">
+      <div class="tabs">
+        <button id="tab-login" class="active" onclick="authTab('login')">管理员登录</button>
+        <button id="tab-register" style="display:none" onclick="authTab('register')">注册</button>
+      </div>
+      <div class="field"><label>用户名</label><input id="l-user" autocomplete="username" placeholder="3-64 位字母、数字或 ._-"></div>
+      <div class="field"><label>密码</label><input id="l-pass" type="password" autocomplete="current-password" placeholder="至少 12 位，含大小写与数字"></div>
+      <div class="field" id="l-totp-wrap" hidden><label>两步验证码</label><input id="l-totp" inputmode="numeric" maxlength="6" placeholder="123456"></div>
+      <button class="btn" id="l-btn" onclick="authSubmit()">登录</button>
+      <div class="mutedbox" style="padding:10px 0 0"><a href="#" onclick="toggleTotp(event)">使用两步验证码</a></div>
+      <div class="mutedbox" style="padding:6px 0 0">普通用户请在 Android 客户端注册与使用。</div>
+    </div>
+    <div class="mutedbox" style="font-size:11px">登录即表示你理解：真实交易有风险，AI 不保证盈利。</div>
+  </div>
+</div>
+
+<div id="app" class="shell" hidden>
+  <aside>
+    <div class="brandmini"><img src="/ui/assets/aion-brand.webp" alt="AION"><span>AION<small>INTELLIGENCE NETWORK</small></span></div>
+    <nav id="nav-desktop"></nav>
+    <div class="foot" id="side-foot"></div>
+  </aside>
+  <div class="main">
+    <header>
+      <span class="logo"><img src="/ui/assets/aion-brand.webp" alt="">AION</span>
+      <h1 id="page-title">概览</h1>
+      <div class="right">
+        <span class="pill"><span class="dot"></span><span id="mode-badge">PAPER</span></span>
+        <button class="bell" onclick="switchTab('notifications')"><span>◔</span><b id="notif-badge" hidden>0</b></button>
+      </div>
+    </header>
+    <main>
+      <section id="p-home" class="page"></section>
+      <section id="p-agents" class="page" hidden></section>
+      <section id="p-market" class="page" hidden></section>
+      <section id="p-trade" class="page" hidden></section>
+      <section id="p-risk" class="page" hidden></section>
+      <section id="p-strategies" class="page" hidden></section>
+      <section id="p-ai" class="page" hidden></section>
+      <section id="p-autopilot" class="page" hidden></section>
+      <section id="p-learning" class="page" hidden></section>
+      <section id="p-factors" class="page" hidden></section>
+      <section id="p-research-lab" class="page" hidden></section>
+      <section id="p-notifications" class="page" hidden></section>
+      <section id="p-exchange" class="page" hidden></section>
+      <section id="p-users" class="page" hidden></section>
+      <section id="p-models" class="page" hidden></section>
+      <section id="p-me" class="page" hidden></section>
+    </main>
+  </div>
+  <nav id="nav"></nav>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const API = "/api/v1";
+const S = {
+  token: localStorage.getItem("aion_token") || "",
+  refresh: localStorage.getItem("aion_refresh") || "",
+  tab: "home",
+  timer: null,
+  market: { symbol: "BTCUSDT", interval: "15m", timer: null, snapshot: null },
+  ai: { runId: null, timer: null, roster: null },
+  overview: null,
+  me: null,
+  features: [],
+  authMode: "login",
+  apMode: "PAPER",
+};
+
+/* ---------- utils ---------- */
+const $ = (id) => document.getElementById(id);
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const n = (v, d = 2) => {
+  if (v === null || v === undefined || v === "") return "—";
+  const x = Number(v);
+  if (!isFinite(x)) return esc(v);
+  return x.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+};
+const money = (v, d = 2) => (v === null || v === undefined) ? "—" : "$" + n(v, d);
+const pct = (v, d = 2) => (v === null || v === undefined) ? "—" : n(v, d) + "%";
+const cls = (v) => Number(v) > 0 ? "up" : Number(v) < 0 ? "down" : "";
+const dt = (v) => {
+  if (!v) return "—";
+  const d = new Date(v);
+  if (isNaN(d)) return esc(v);
+  const p = (x) => String(x).padStart(2, "0");
+  return `${d.getMonth()+1}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+};
+const ago = (v) => {
+  if (!v) return "—";
+  const s = Math.max(0, (Date.now() - new Date(v).getTime()) / 1000);
+  if (s < 60) return `${Math.floor(s)} 秒前`;
+  if (s < 3600) return `${Math.floor(s/60)} 分钟前`;
+  if (s < 86400) return `${Math.floor(s/3600)} 小时前`;
+  return `${Math.floor(s/86400)} 天前`;
+};
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2800);
+}
+function showLogin() {
+  $("app").hidden = true; $("login").hidden = false;
+  S.token = S.refresh = ""; S.me = null; S.features = [];
+  localStorage.removeItem("aion_token"); localStorage.removeItem("aion_refresh");
+}
+async function loadIdentity() {
+  const me = await api("/auth/me");
+  S.me = me;
+  S.features = Array.isArray(me?.features) ? me.features : [];
+  renderNav();
+  $("side-foot").innerHTML = `${esc(me.username)}<br>${me.is_admin ? "管理员" : "普通用户"} · ${me.totp_enabled ? "已开两步验证" : "未开两步验证"}`;
+  return me;
+}
+function showApp() { $("login").hidden = true; $("app").hidden = false; }
+
+/* ---------- api ---------- */
+async function rawFetch(path, opts = {}) {
+  const headers = Object.assign({ "Content-Type": "application/json" }, opts.headers || {});
+  if (S.token) headers.Authorization = "Bearer " + S.token;
+  const res = await fetch(API + path, { ...opts, headers });
+  let data = null;
+  const text = await res.text();
+  if (text) { try { data = JSON.parse(text); } catch { data = { raw: text }; } }
+  return { res, data };
+}
+async function refreshToken() {
+  if (!S.refresh) return false;
+  try {
+    const { res, data } = await rawFetch("/auth/refresh", {
+      method: "POST", body: JSON.stringify({ refresh_token: S.refresh })
+    });
+    if (!res.ok || !data?.access_token) return false;
+    setTokens(data); return true;
+  } catch { return false; }
+}
+function setTokens(d) {
+  S.token = d.access_token || ""; S.refresh = d.refresh_token || S.refresh;
+  localStorage.setItem("aion_token", S.token);
+  if (S.refresh) localStorage.setItem("aion_refresh", S.refresh);
+}
+async function api(path, opts = {}) {
+  let r = await rawFetch(path, opts);
+  if (r.res.status === 401 && S.refresh) {
+    if (await refreshToken()) r = await rawFetch(path, opts);
+  }
+  if (r.res.status === 401) { showLogin(); throw new Error("登录已失效"); }
+  if (!r.res.ok) {
+    const e = r.data?.error;
+    throw new Error(e?.message || (e?.code ? e.code : `HTTP ${r.res.status}`));
+  }
+  return r.data;
+}
+function toggleTotp(e) {
+  e.preventDefault();
+  const w = $("l-totp-wrap");
+  w.hidden = !w.hidden;
+  if (!w.hidden) $("l-totp").focus();
+}
+function authTab(mode) {
+  S.authMode = mode;
+  $("tab-login").classList.toggle("active", mode === "login");
+  $("tab-register").classList.toggle("active", mode === "register");
+  $("l-btn").textContent = mode === "login" ? "登录" : "创建账号";
+  $("l-pass").setAttribute("autocomplete", mode === "login" ? "current-password" : "new-password");
+}
+async function authSubmit() {
+  const btn = $("l-btn");
+  const body = { username: $("l-user").value.trim(), password: $("l-pass").value, device_name: "AION Web" };
+  if (!body.username || !body.password) return toast("请输入用户名和密码");
+  if (S.authMode === "login") {
+    const t = $("l-totp").value.trim();
+    if (t) body.totp_code = t;
+  }
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> 请稍候';
+  try {
+    const { res, data } = await rawFetch("/auth/" + (S.authMode === "login" ? "login" : "register"), {
+      method: "POST", body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      if (res.status === 429) throw new Error("尝试次数过多，请稍后再试");
+      if (res.status === 401) throw new Error("用户名、密码或验证码不正确");
+      throw new Error(data?.error?.message || `请求失败 (HTTP ${res.status})`);
+    }
+    setTokens(data);
+    showApp();
+    await loadIdentity();
+    switchTab("home");
+    if (S.authMode === "register") toast("注册成功，模拟账户已开通");
+  } catch (e) {
+    toast(e.message || "请求失败");
+  } finally {
+    btn.disabled = false; btn.textContent = S.authMode === "login" ? "登录" : "创建账号";
+  }
+}
+
+/* ---------- navigation ---------- */
+const MENU = [
+  { tab: "home", ico: "◧", label: "概览" },
+  { tab: "agents", ico: "◎", label: "六 AI" },
+  { tab: "autopilot", ico: "▶", label: "托管" },
+  { tab: "trade", ico: "⇅", label: "交易" },
+  { tab: "market", ico: "◈", label: "行情" },
+  { tab: "risk", ico: "◇", label: "风控" },
+  { tab: "strategies", ico: "▤", label: "策略" },
+  { tab: "learning", ico: "✎", label: "进化" },
+  { tab: "factors", ico: "∑", label: "因子" },
+  { tab: "research-lab", ico: "⌘", label: "研究实验室" },
+  { tab: "notifications", ico: "◔", label: "通知" },
+  { tab: "exchange", ico: "₿", label: "币安" },
+  { tab: "users", ico: "☷", label: "用户" },
+  { tab: "models", ico: "⚙", label: "模型" },
+  { tab: "me", ico: "☰", label: "我的" },
+];
+const TITLES = {
+  home: "概览", agents: "六个 AI 协作", market: "行情", trade: "交易",
+  risk: "风控中心", strategies: "策略库", ai: "AI 分析详情",
+  autopilot: "AI 全权托管", learning: "学习与进化", factors: "因子研究", "research-lab": "自主研究实验室", notifications: "通知中心",
+  exchange: "币安 API", users: "用户管理", models: "大模型 API", me: "我的",
+};
+function renderNav() {
+  const allowed = new Set(S.features || []);
+  const items = MENU.filter(m => !allowed.size || allowed.has(m.tab));
+  const html = items.map(m => `
+    <button data-tab="${m.tab}" class="${m.tab === S.tab ? "active" : ""}" onclick="switchTab('${m.tab}')">
+      <span class="ico">${m.ico}</span>${m.label}</button>`).join("");
+  $("nav").innerHTML = html;
+  $("nav-desktop").innerHTML = html;
+}
+function switchTab(tab) {
+  if ((S.features || []).length && !S.features.includes(tab)) tab = "home";
+  S.tab = tab;
+  document.querySelectorAll(".page").forEach(p => p.hidden = true);
+  $("p-" + tab).hidden = false;
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  $("page-title").textContent = TITLES[tab] || "";
+  clearInterval(S.timer);
+  clearInterval(S.ai.timer);
+  clearInterval(S.market.timer);
+  const load = {
+    home: loadHome, agents: loadAgents, market: loadMarket, trade: loadTrade,
+    risk: loadRisk, strategies: loadStrategies, ai: loadAI,
+    autopilot: loadAutopilot, learning: loadLearning, factors: loadFactors, "research-lab": loadResearchLab, notifications: loadNotifications,
+    exchange: loadExchange, users: loadUsers, models: loadModels, me: loadMe,
+  }[tab];
+  if (load) load();
+  if (["home", "autopilot", "agents", "trade", "notifications"].includes(tab)) {
+    S.timer = setInterval(load, tab === "agents" ? 5000 : 15000);
+  } else if (tab === "market") {
+    S.timer = setInterval(load, 8000);
+    // 最新价走服务端 1 秒实时行情，每 1 秒刷新一次。
+    S.market.timer = setInterval(refreshMarketPrice, 1000);
+  }
+  window.scrollTo({ top: 0 });
+}
+
+/* ---------- home ---------- */
+async function loadHome() {
+  const el = $("p-home");
+  if (!el.dataset.ready) el.innerHTML = '<div class="mutedbox">加载中…</div>';
+  try {
+    const [sys, acc, ap, notif] = await Promise.all([
+      api("/system/status"),
+      api("/account/overview").catch(() => null),
+      api("/autopilot/status").catch(() => null),
+      api("/notifications?limit=1").catch(() => null),
+    ]);
+    el.dataset.ready = "1";
+    $("mode-badge").textContent = (ap?.config?.execution_mode || sys.trading_mode) + (sys.mainnet_unlocked ? " · 已解锁" : "");
+    setNotifBadge(notif?.unread || 0);
+
+    await ensureRoster();
+    const roster = S.ai.roster || [];
+    const latest = ap?.recent_runs?.[0] || null;
+    let latestDetail = null;
+    if (latest) latestDetail = await api("/agents/runs/" + latest.id).catch(() => null);
+    const live = ap?.live_positions || [];
+    const paper = ap?.open_positions || [];
+    const enabled = !!ap?.config?.enabled;
+    const exec = !!ap?.config?.auto_execute;
+    const mode = ap?.config?.execution_mode || sys.trading_mode;
+
+    const statusText = !enabled ? "待启动" : exec ? "全权托管中" : "分析中 · 不自动下单";
+    const hero = `
+      <div class="hero">
+        <div class="tag">SIX AGENTS · ONE DECISION</div>
+        <h2>六个 AI，正在${enabled ? "为你盯盘" : "等待你的授权"}。</h2>
+        <p>市场状态、技术面、资金面、策略、决策、反方风控——六个 AI 接力判断；通过风控后，可由 AI 自动开仓、挂止盈止损并平仓。</p>
+        <div class="chips" style="margin-top:14px;margin-bottom:0">
+          <span class="chip ${enabled ? "ok" : ""}">托管 <b>${statusText}</b></span>
+          <span class="chip">账户 <b>${esc(mode)}</b></span>
+          <span class="chip">今日盈亏 <b class="${cls(ap?.today_realized_pnl_usd)}">${money(ap?.today_realized_pnl_usd)}</b></span>
+          <span class="chip">持仓 <b>${live.length + paper.length}</b></span>
+        </div>
+        <div class="actions">
+          <button class="btn ${exec ? "secondary" : ""}" onclick="switchTab('autopilot')">${exec ? "管理托管" : "开启 AI 托管"}</button>
+          <button class="btn secondary" onclick="switchTab('agents')">查看六 AI 协作</button>
+        </div>
+      </div>`;
+
+    const six = `
+      <div class="card"><h2>六个 AI 的当前状态</h2>
+        <div class="six-grid">
+          ${roster.map((a, i) => {
+            const msg = (latestDetail?.messages || []).find(m => m.agent_name === a.name);
+            const st = msg ? (msg.status === "OK" ? "已完成" : msg.status) : (enabled ? "在岗" : "待命");
+            return `<div class="six-cell ${enabled ? "on" : "off"}">
+              <div class="num">0${i+1} · ${esc(a.stage)}</div><div class="nm">${esc(a.role)}</div>
+              <div class="st ${msg?.status === "OK" ? "up" : ""}">${esc(st)}</div></div>`;
+          }).join("")}
+        </div>
+        ${latest ? `<div class="decision-banner ${latest.verdict === "TRADE" ? "trade" : "wait"}" style="margin-top:12px;margin-bottom:0">
+          <b>最近一次合议：${esc(latest.symbol)} · ${esc(latest.verdict || "观望")}</b><br>
+          <span class="muted">${ago(latest.started_at)} · ${esc((latest.summary || "").slice(0, 140))}</span>
+        </div>` : ""}
+      </div>`;
+
+    const acct = acc?.account;
+    const acctCard = !acct ? `
+      <div class="card"><h2>账户</h2><div class="mutedbox">${mode === "PAPER" ? "模拟盘暂无账户数据，AI 首笔交易后会出现。" : "暂无账户数据，请检查交易所密钥。"}</div></div>`
+      : `
+      <div class="card">
+        <h2>账户 · ${esc(acc.mode)}${acc.stale ? ' <span class="warn">（数据过期）</span>' : ""}</h2>
+        <div class="big">${money(acct.total_wallet_balance)}</div>
+        <div class="muted" style="font-size:12px;margin:2px 0 10px">钱包余额 (USDT) · 更新于 ${ago(acct.captured_at)}</div>
+        <div class="row"><span class="label">未实现盈亏</span><span class="val ${cls(acct.total_unrealized_pnl)}">${money(acct.total_unrealized_pnl)}</span></div>
+        <div class="row"><span class="label">可用余额</span><span class="val">${money(acct.available_balance)}</span></div>
+        <div class="row"><span class="label">保证金率</span><span class="val">${acct.margin_ratio ?? "—"}</span></div>
+        <div class="row"><span class="label">日已实现盈亏</span><span class="val ${cls(acct.daily_realized_pnl)}">${money(acct.daily_realized_pnl)}</span></div>
+      </div>`;
+
+    const liveCard = live.length ? `
+      <div class="card"><h2>真实持仓 · AI 托管中</h2>
+      ${live.map(p => `
+        <div class="list-item">
+          <div class="li-top"><b>${esc(p.symbol)} ${esc(p.position_side)} ${p.leverage}x</b>
+            <span class="status ${p.protection_status === "ACTIVE" ? "OK" : "VETO"}">保护单 ${esc(p.protection_status)}</span></div>
+          <div class="li-sub">数量 ${n(p.quantity, 6)} · 开仓 ${n(p.entry_price, 4)} · ${esc(p.mode)} · ${ago(p.opened_at)}</div>
+          <div class="li-sub">止损 ${p.stop_loss ? n(p.stop_loss, 4) : "—"} · 止盈 ${p.take_profit ? n(p.take_profit, 4) : "—"}</div>
+          <div class="inline" style="margin-top:8px"><button class="btn small danger" onclick="closeLive('${p.id}','${esc(p.symbol)}')">立即平仓</button></div>
+        </div>`).join("")}
+      </div>` : "";
+    const paperCard = paper.length ? `
+      <div class="card"><h2>模拟持仓</h2>
+      ${paper.map(p => `
+        <div class="list-item">
+          <div class="li-top"><b>${esc(p.symbol)} ${esc(p.position_side)} ${p.leverage}x</b><span>${n(p.quantity, 6)}</span></div>
+          <div class="li-sub">开仓 ${n(p.entry_price, 4)} · 止损 ${p.stop_loss ? n(p.stop_loss, 4) : "—"} · 止盈 ${p.take_profit ? n(p.take_profit, 4) : "—"} · ${ago(p.opened_at)}</div>
+        </div>`).join("")}
+      </div>` : "";
+
+    const ctl = sys.controls;
+    const ctlCard = !S.me?.is_admin ? "" : `
+      <div class="card"><h2>全局风控开关</h2>
+        <div class="row"><span class="label">停止新开仓</span><span class="val ${ctl?.stop_new_trades ? "down" : "up"}">${ctl?.stop_new_trades ? "已开启" : "正常"}</span></div>
+        <div class="row"><span class="label">暂停 AI</span><span class="val ${ctl?.pause_ai ? "warn" : "up"}">${ctl?.pause_ai ? "已暂停" : "运行中"}</span></div>
+        <div class="row"><span class="label">紧急停止</span><span class="val ${ctl?.emergency_stop ? "down" : "up"}">${ctl?.emergency_stop ? "已触发" : "未触发"}</span></div>
+        <div class="inline" style="margin-top:10px">
+          <button class="btn small secondary" onclick="toggleControl('STOP_NEW_TRADES', ${!ctl?.stop_new_trades})">${ctl?.stop_new_trades ? "恢复开仓" : "停止开仓"}</button>
+          <button class="btn small danger" onclick="emergencyStop()">紧急停止</button>
+        </div>
+      </div>`;
+    el.innerHTML = hero + six + `<div class="grid2" style="gap:14px">${acctCard}${liveCard || paperCard}</div>` + (liveCard && paperCard ? paperCard : "") + ctlCard;
+  } catch (e) {
+    el.innerHTML = `<div class="card"><div class="mutedbox">加载失败：${esc(e.message)}</div></div>`;
+  }
+}
+function setNotifBadge(count) {
+  const b = $("notif-badge");
+  if (!b) return;
+  b.hidden = !count;
+  b.textContent = count > 99 ? "99+" : count;
+}
+async function closeLive(id, symbol) {
+  if (!confirm(`确认立即市价平仓 ${symbol}？`)) return;
+  try {
+    await api("/autopilot/positions/" + id + "/close", { method: "POST" });
+    toast("平仓已提交"); loadHome();
+  } catch (e) { toast(e.message); }
+}
+async function toggleControl(action, enabled) {
+  try {
+    await api("/system/controls", { method: "POST", body: JSON.stringify({ action, enabled, reason: "web console" }) });
+    toast(enabled ? "已开启" : "已恢复"); loadHome();
+  } catch (e) { toast(e.message); }
+}
+async function emergencyStop() {
+  if (!confirm("确认触发紧急停止？将立即阻止所有新开仓。")) return;
+  try {
+    await api("/system/controls", { method: "POST", body: JSON.stringify({ action: "EMERGENCY_STOP", enabled: true, reason: "web console" }) });
+    toast("紧急停止已触发"); loadHome();
+  } catch (e) { toast(e.message); }
+}
+
+/* ---------- agents (six AI) ---------- */
+async function ensureRoster() {
+  if (S.ai.roster) return S.ai.roster;
+  try { S.ai.roster = await api("/agents/roster"); } catch { S.ai.roster = []; }
+  return S.ai.roster;
+}
+async function loadAgents() {
+  const el = $("p-agents");
+  const roster = await ensureRoster();
+  if (!el.dataset.ready) {
+    el.innerHTML = `
+      <div class="card">
+        <h2>六个 AI 如何协作</h2>
+        <div class="pipeline" id="ag-pipeline"></div>
+        <div class="li-sub" style="margin-top:8px">前三个 AI 负责感知市场，策略研究员给出方案，首席决策官拍板，反方风控官拥有一票否决权。全部结论会写入学习闭环。</div>
+      </div>
+      <div class="card">
+        <h2>发起一次合议</h2>
+        <div class="grid2">
+          <div class="field"><label>交易对</label><input id="ag-symbol" value="BTCUSDT"></div>
+          <div class="field"><label>周期</label><select id="ag-interval">
+            <option>15m</option><option>1h</option><option>4h</option><option>1d</option></select></div>
+        </div>
+        <button class="btn" id="ag-btn" onclick="startAnalysis('ag')">让六个 AI 开始分析</button>
+        <div class="li-sub" style="margin-top:8px">通常 30–180 秒。只产出决策建议，不会直接下单；下单由「AI 全权托管」按你的授权执行。</div>
+      </div>
+      <div class="card"><h2>本次合议详情</h2><div id="ag-current"><div class="mutedbox">选择一次运行查看六个 AI 的完整输出</div></div></div>
+      <div class="card"><h2>历史合议</h2><div id="ag-runs"><div class="mutedbox">加载中…</div></div></div>`;
+    el.dataset.ready = "1";
+  }
+  try {
+    const runs = await api("/agents/runs?limit=10");
+    const items = runs.items || [];
+    const latest = items[0] || null;
+    if (latest && (!S.ai.runId || !items.some(r => r.id === S.ai.runId))) S.ai.runId = latest.id;
+    let detail = null;
+    if (S.ai.runId) detail = await api("/agents/runs/" + S.ai.runId).catch(() => null);
+    renderPipeline(roster, detail);
+    $("ag-current").innerHTML = detail ? renderRunDetail(detail) : '<div class="mutedbox">暂无合议记录</div>';
+    $("ag-runs").innerHTML = items.length ? items.map(r => `
+      <div class="list-item" onclick="openRun('${r.id}','agents')" style="cursor:pointer">
+        <div class="li-top"><b>${esc(r.symbol)} · ${esc(r.interval)}</b>
+          <span class="status ${esc(r.status)}">${esc(r.status)}</span></div>
+        <div class="li-sub">${esc(r.verdict || "—")} · 置信度 ${r.confidence ?? "—"} · ${ago(r.created_at)} · $${n(r.total_cost_usd, 4)}</div>
+      </div>`).join("") : '<div class="mutedbox">暂无运行</div>';
+    if (detail && detail.status === "RUNNING") {
+      clearInterval(S.ai.timer);
+      S.ai.timer = setInterval(() => { if (S.tab === "agents") loadAgents(); }, 4000);
+    }
+  } catch (e) {
+    $("ag-runs").innerHTML = `<div class="mutedbox">加载失败：${esc(e.message)}</div>`;
+  }
+}
+function renderPipeline(roster, detail) {
+  const box = $("ag-pipeline");
+  if (!box) return;
+  const msgs = detail?.messages || [];
+  const byName = Object.fromEntries(msgs.map(m => [m.agent_name, m]));
+  box.innerHTML = roster.map((a, i) => {
+    const m = byName[a.name];
+    const status = m?.status || (detail ? "WAIT" : "待命");
+    const done = m && m.status === "OK";
+    const veto = a.veto && m && (m.status !== "OK" || (m.warnings || []).length);
+    const conf = m?.confidence !== null && m?.confidence !== undefined ? Math.round(Number(m.confidence) * 100) + "%" : "";
+    const pctDone = done ? 100 : status === "RUNNING" ? 55 : 0;
+    return `<div class="agent ${done ? "done" : ""} ${status === "RUNNING" ? "running" : ""} ${veto ? "veto" : ""}">
+      <div class="idx">STEP 0${i+1} · ${esc(a.stage)}</div>
+      <div class="name">${esc(a.title)}</div>
+      <div class="purpose">${esc(a.purpose)}</div>
+      <div class="meta"><span>${m?.latency_ms ? m.latency_ms + "ms" : status}</span><span>${conf}</span></div>
+      <div class="glow"><i style="width:${pctDone}%"></i></div>
+    </div>`;
+  }).join("");
+}
+function renderRunDetail(r) {
+  const roster = S.ai.roster || [];
+  const order = Object.fromEntries(roster.map((a, i) => [a.name, i + 1]));
+  const msgs = (r.messages || []).slice().sort((a, b) => (order[a.agent_name] || a.seq) - (order[b.agent_name] || b.seq));
+  const title = Object.fromEntries(roster.map(a => [a.name, a.title]));
+  return `
+    <div class="row"><span class="label">${esc(r.symbol)} · ${esc(r.interval)} · ${esc(r.mode)}</span>
+      <span class="status ${esc(r.status)}">${esc(r.status)}</span></div>
+    <div class="row"><span class="label">合议结论</span>
+      <span class="val ${r.verdict === "TRADE" ? "up" : "warn"}">${esc(r.verdict || "—")}</span></div>
+    <div class="row"><span class="label">置信度</span><span class="val">${r.confidence ?? "—"}</span></div>
+    <div class="row"><span class="label">耗时 / 成本</span>
+      <span class="val">${r.duration_ms ? (r.duration_ms / 1000).toFixed(1) + "s" : "—"} · $${n(r.total_cost_usd, 4)}</span></div>
+    ${r.error ? `<div class="li-sub down">错误：${esc(r.error)}</div>` : ""}
+    ${r.summary ? `<div class="li-sub" style="color:var(--text);margin-top:8px">${esc(r.summary)}</div>` : ""}
+    <div class="sep"></div>
+    ${msgs.length ? msgs.map(m => `
+      <div class="msg">
+        <div class="who">${esc(title[m.agent_name] || m.agent_name)} · <span class="status ${esc(m.status)}">${esc(m.status)}</span>
+          ${m.latency_ms ? `<span class="muted">${m.latency_ms}ms</span>` : ""}
+          ${m.confidence !== null && m.confidence !== undefined ? `<span class="muted"> · 置信度 ${Math.round(Number(m.confidence) * 100)}%</span>` : ""}</div>
+        <div class="txt">${esc(m.summary || "(无摘要)")}</div>
+        ${(m.warnings || []).length ? `<div class="warn">⚠ ${m.warnings.map(w => esc(typeof w === "string" ? w : JSON.stringify(w))).join("；")}</div>` : ""}
+      </div>`).join("") : '<div class="mutedbox">等待 AI 输出…</div>'}`;
+}
+function openRun(id, tab) {
+  S.ai.runId = id;
+  if (tab) switchTab(tab);
+  else pollRun(id);
+}
+async function startAnalysis(prefix) {
+  const btn = $(prefix + "-btn");
+  const symbol = $(prefix + "-symbol").value.trim().toUpperCase();
+  const interval = $(prefix + "-interval").value;
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> 启动中';
+  try {
+    const r = await api("/agents/analyze", { method: "POST", body: JSON.stringify({ symbol, interval }) });
+    S.ai.runId = r.run_id;
+    toast("六个 AI 已开始合议");
+    if (S.tab === "agents") loadAgents(); else pollRun(r.run_id);
+  } catch (e) { toast(e.message); }
+  finally { btn.disabled = false; btn.textContent = "让六个 AI 开始分析"; }
+}
+async function pollRun(id) {
+  clearInterval(S.ai.timer);
+  const box = $("a-current");
+  if (!box) return;
+  box.innerHTML = '<div class="mutedbox">加载中…</div>';
+  const tick = async () => {
+    try {
+      const r = await api("/agents/runs/" + id);
+      box.innerHTML = renderRunDetail(r);
+      if (r.status !== "RUNNING") clearInterval(S.ai.timer);
+    } catch (e) {
+      box.innerHTML = `<div class="mutedbox">${esc(e.message)}</div>`;
+      clearInterval(S.ai.timer);
+    }
+  };
+  await tick();
+  S.ai.timer = setInterval(tick, 3000);
+}
+
+/* ---------- market ---------- */
+async function loadMarket() {
+  const el = $("p-market");
+  try {
+    let sym = S.market.symbol;
+    let symbols = el._symbols;
+    if (!symbols) {
+      const s = await api("/market/symbols");
+      symbols = (s.items || []).filter(x => x.is_allowed);
+      el._symbols = symbols;
+    }
+    if (!el.dataset.ready) {
+      el.innerHTML = `
+        <div class="card">
+          <div class="inline" style="margin-bottom:8px">
+            <select id="m-symbol" onchange="S.market.symbol=this.value;this.blur();loadMarket()">
+              ${symbols.map(x => `<option value="${x.symbol}" ${x.symbol === sym ? "selected" : ""}>${x.symbol}</option>`).join("") || '<option value="BTCUSDT">BTCUSDT</option>'}
+            </select>
+          </div>
+          <div id="m-price"><div class="mutedbox">加载中…</div></div>
+          <svg class="spark" id="m-spark" viewBox="0 0 300 56" preserveAspectRatio="none"></svg>
+          <div id="m-meta"></div>
+        </div>
+        <div class="card"><h2>衍生品</h2><div id="m-deriv"><div class="mutedbox">加载中…</div></div></div>
+        <div class="card"><h2>合约规则</h2><div id="m-rules"></div></div>`;
+      el.dataset.ready = "1";
+    }
+    const [tick, candles, deriv] = await Promise.all([
+      api(`/market/snapshot/${encodeURIComponent(sym)}`),
+      api(`/market/candles?symbol=${encodeURIComponent(sym)}&interval=${S.market.interval}&limit=60`),
+      api(`/market/derivatives/${encodeURIComponent(sym)}`).catch(() => null),
+    ]);
+    const t = tick?.ticker;
+    S.market.snapshot = t || null;
+    if (!tick?.has_data || !t) {
+      $("m-price").innerHTML = '<div class="mutedbox">该交易对暂无行情数据</div>';
+    } else {
+      $("m-price").innerHTML = `
+        <div class="label">最新价 <span id="m-live" class="up" style="font-size:11px">实时</span></div>
+        <div class="big ${cls(t.price_change_pct_24h)}" id="m-last">${n(t.last_price, 2)}</div>
+        <div class="${cls(t.price_change_pct_24h)}" id="m-chg" style="font-size:13px">${pct(t.price_change_pct_24h)} · 24h</div>
+        <div class="sep"></div>
+        <div class="kv">
+          <span class="k">标记价</span><span class="v">${n(t.mark_price, 2)}</span>
+          <span class="k">指数价</span><span class="v">${n(t.index_price, 2)}</span>
+          <span class="k">24h 量</span><span class="v">${n(t.quote_volume_24h, 0)} USDT</span>
+          <span class="k">数据时间</span><span class="v" id="m-ts">${ago(t.source_ts)}${t.stale ? ' <span class="warn">过期</span>' : ""}</span>
+        </div>`;
+      refreshMarketPrice();
+    }
+    drawSpark(document.getElementById("m-spark"), candles?.candles || []);
+    $("m-meta").innerHTML = candles?.candles?.length
+      ? `<div class="li-sub">${S.market.interval} K线 · ${candles.candles.length} 根 · 最近收盘 ${n(candles.candles[candles.candles.length-1].close, 2)}</div>`
+      : '<div class="li-sub">暂无 K 线</div>';
+    const d = deriv?.derivatives;
+    $("m-deriv").innerHTML = deriv?.has_data && d ? `
+      <div class="kv">
+        <span class="k">资金费率</span><span class="v ${cls(d.funding_rate)}">${d.funding_rate === null ? "—" : n(Number(d.funding_rate) * 100, 4) + "%"}</span>
+        <span class="k">未平仓量</span><span class="v">${n(d.open_interest, 0)}</span>
+        <span class="k">基差</span><span class="v">${pct(d.basis_pct)}</span>
+        <span class="k">下次结算</span><span class="v">${dt(d.next_funding_at)}</span>
+      </div>` : '<div class="mutedbox">暂无衍生品数据</div>';
+    const info = symbols.find(x => x.symbol === sym);
+    $("m-rules").innerHTML = info ? `
+      <div class="kv">
+        <span class="k">最小下单量</span><span class="v">${n(info.min_qty, 4)}</span>
+        <span class="k">最小名义价值</span><span class="v">${n(info.min_notional, 2)} USDT</span>
+        <span class="k">价格精度</span><span class="v">${esc(info.price_precision)} 位</span>
+        <span class="k">最大杠杆</span><span class="v">${esc(info.max_leverage)}x</span>
+      </div>` : '<div class="mutedbox">暂无规则</div>';
+  } catch (e) {
+    el.innerHTML = `<div class="card"><div class="mutedbox">加载失败：${esc(e.message)}</div></div>`;
+  }
+}
+async function refreshMarketPrice() {
+  const snap = S.market.snapshot;
+  if (!snap) return;
+  try {
+    const data = await api("/market/live");
+    const item = (data.items || []).find(x => x.symbol === S.market.symbol);
+    if (!item) return;
+    const last = $("m-last");
+    const chg = $("m-chg");
+    const ts = $("m-ts");
+    if (last) last.textContent = n(item.price, 2);
+    if (chg) chg.textContent = `${pct(item.change_pct_24h)} · 24h`;
+    if (ts) ts.textContent = ago(item.captured_at);
+    const badge = $("m-live");
+    if (badge) badge.textContent = item.age_ms != null && item.age_ms < 5000 ? "实时" : "延迟";
+  } catch (e) {
+    /* transient network error: keep the last rendered price */
+  }
+}
+function drawSpark(svg, candles) {
+  if (!svg) return;
+  if (!candles.length) { svg.innerHTML = ""; return; }
+  const xs = candles.map(c => Number(c.close));
+  const min = Math.min(...xs), max = Math.max(...xs), span = (max - min) || 1;
+  const pts = xs.map((v, i) => `${(i / (xs.length - 1 || 1)) * 300},${52 - ((v - min) / span) * 48}`).join(" ");
+  const color = xs[xs.length - 1] >= xs[0] ? "#0ecb81" : "#f6465d";
+  svg.innerHTML = `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.6" vector-effect="non-scaling-stroke"/>`;
+}
+
+/* ---------- trade ---------- */
+async function loadTrade() {
+  const el = $("p-trade");
+  if (!el.dataset.ready) {
+    el.innerHTML = `
+      <div class="notice">手动意图只做「风控审批 + 记录」，不会直接下单。要让 AI 自动开仓、止盈止损与平仓，请使用 <a href="#" onclick="switchTab('autopilot');return false">AI 全权托管</a>。</div>
+      <div class="card"><h2>新建交易意图（需通过风控）</h2>
+        <div class="grid2">
+          <div class="field"><label>交易对</label><input id="t-symbol" value="BTCUSDT"></div>
+          <div class="field"><label>方向</label><select id="t-side"><option value="BUY">BUY</option><option value="SELL">SELL</option></select></div>
+          <div class="field"><label>仓位方向</label><select id="t-pos"><option value="LONG">LONG</option><option value="SHORT">SHORT</option></select></div>
+          <div class="field"><label>名义价值 (USDT)</label><input id="t-notional" inputmode="decimal" value="100"></div>
+          <div class="field"><label>杠杆</label><input id="t-lev" inputmode="numeric" value="3"></div>
+          <div class="field"><label>置信度 (0-1)</label><input id="t-conf" inputmode="decimal" placeholder="0.7"></div>
+          <div class="field"><label>止损价</label><input id="t-sl" inputmode="decimal" placeholder="可选"></div>
+          <div class="field"><label>止盈价</label><input id="t-tp" inputmode="decimal" placeholder="可选"></div>
+        </div>
+        <button class="btn" id="t-btn" onclick="submitIntent()">提交意图</button>
+        <div id="t-result"></div>
+      </div>
+      <div class="card"><h2>最近订单</h2><div id="t-orders"><div class="mutedbox">加载中…</div></div></div>`;
+    el.dataset.ready = "1";
+  }
+  try {
+    const p = await api("/trading/orders?limit=10");
+    const items = p.items || [];
+    $("t-orders").innerHTML = items.length ? items.map(o => `
+      <div class="list-item">
+        <div class="li-top"><b>${esc(o.symbol)} ${esc(o.side)} ${esc(o.position_side)}</b>
+          <span class="status ${esc(o.status)}">${esc(o.status)}</span></div>
+        <div class="li-sub">${esc(o.order_type)} · 数量 ${n(o.quantity, 4)} · 成交 ${n(o.filled_quantity, 4)} @ ${n(o.avg_fill_price, 2)}</div>
+        <div class="li-sub">${dt(o.created_at)} · ${esc(o.mode)}${o.error_code ? " · " + esc(o.error_code) : ""}</div>
+      </div>`).join("") : '<div class="mutedbox">暂无订单</div>';
+  } catch (e) {
+    $("t-orders").innerHTML = `<div class="mutedbox">加载失败：${esc(e.message)}</div>`;
+  }
+}
+async function submitIntent() {
+  const btn = $("t-btn");
+  const body = {
+    symbol: $("t-symbol").value.trim().toUpperCase(),
+    side: $("t-side").value,
+    position_side: $("t-pos").value,
+    order_type: "MARKET",
+    notional_usd: $("t-notional").value || null,
+    requested_leverage: Number($("t-lev").value || 1),
+    reason: "web console",
+  };
+  if ($("t-sl").value) body.stop_loss = $("t-sl").value;
+  if ($("t-tp").value) body.take_profit = $("t-tp").value;
+  if ($("t-conf").value) body.confidence = Number($("t-conf").value);
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> 提交中';
+  try {
+    const r = await api("/trading/intents", { method: "POST", body: JSON.stringify(body) });
+    const accepted = r.accepted;
+    const codes = r.risk?.reason_codes || [];
+    $("t-result").innerHTML = `
+      <div class="sep"></div>
+      <div class="row"><span class="label">风控结果</span>
+        <span class="val ${accepted ? "up" : "down"}">${accepted ? "通过" : "拒绝"}</span></div>
+      <div class="row"><span class="label">意图状态</span><span class="val">${esc(r.intent?.status)}</span></div>
+      ${codes.length ? `<div class="li-sub" style="margin-top:6px">拒绝原因：${codes.map(esc).join("、")}</div>` : ""}
+      <div class="li-sub">${accepted ? "已通过风控并记录。手动意图不会直接下单。" : "未产生订单。请检查止损、保证金与仓位限制。"}</div>`;
+    loadTrade();
+  } catch (e) {
+    $("t-result").innerHTML = `<div class="sep"></div><div class="down" style="font-size:13px">提交失败：${esc(e.message)}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = "提交意图";
+  }
+}
+
+/* ---------- AI detail page (reuse agents renderer) ---------- */
+async function loadAI() {
+  const el = $("p-ai");
+  if (!el.dataset.ready) {
+    el.innerHTML = `<div class="card"><h2>分析详情</h2><div id="a-current"><div class="mutedbox">从「六 AI」页面选择一次合议，或先发起分析</div></div></div>`;
+    el.dataset.ready = "1";
+  }
+  if (!S.ai.runId) return;
+  await pollRun(S.ai.runId);
+}
+
+/* ---------- risk ---------- */
+async function loadRisk() {
+  const el = $("p-risk");
+  try {
+    const [pol, events, decisions, sys] = await Promise.all([
+      api("/risk/policy").catch(() => null),
+      api("/risk/events?limit=10").catch(() => ({ items: [] })),
+      api("/risk/decisions?limit=10").catch(() => ({ items: [] })),
+      api("/system/status").catch(() => null),
+    ]);
+    const p = pol?.policy;
+    const ctl = sys?.controls;
+    el.innerHTML = `
+      <div class="card"><h2>风控是 AI 之外的最后一道闸门</h2>
+        <div class="li-sub">任何订单（包括 AI 自动下单）都必须通过独立风控引擎；服务端还有不可突破的绝对上限。</div>
+        <div class="sep"></div>
+        ${p ? `<div class="kv">
+          <span class="k">最大杠杆</span><span class="v">${p.max_leverage}x</span>
+          <span class="k">单仓上限</span><span class="v">${money(p.max_position_notional_usd, 0)}</span>
+          <span class="k">总敞口上限</span><span class="v">${money(p.max_total_exposure_usd, 0)}</span>
+          <span class="k">单笔最大亏损</span><span class="v">${money(p.max_single_trade_loss_usd)}</span>
+          <span class="k">日亏损上限</span><span class="v">${money(p.daily_loss_limit_usd)}</span>
+          <span class="k">最大回撤</span><span class="v">${pct(p.max_drawdown_pct)}</span>
+          <span class="k">最大持仓数</span><span class="v">${p.max_open_positions}</span>
+          <span class="k">最低置信度</span><span class="v">${p.min_confidence}</span>
+          <span class="k">强制止损</span><span class="v">${p.required_stop_loss ? "是" : "否"}</span>
+        </div>` : '<div class="mutedbox">暂无风控策略</div>'}
+      </div>
+      <div class="card"><h2>全局开关</h2>
+        <div class="row"><span class="label">停止新开仓</span><span class="val ${ctl?.stop_new_trades ? "down" : "up"}">${ctl?.stop_new_trades ? "已开启" : "正常"}</span></div>
+        <div class="row"><span class="label">暂停 AI</span><span class="val ${ctl?.pause_ai ? "warn" : "up"}">${ctl?.pause_ai ? "已暂停" : "运行中"}</span></div>
+        <div class="inline" style="margin-top:10px">
+          <button class="btn small secondary" onclick="toggleControl('STOP_NEW_TRADES', ${!ctl?.stop_new_trades})">${ctl?.stop_new_trades ? "恢复开仓" : "停止开仓"}</button>
+          ${S.me?.is_admin ? `<button class="btn small danger" onclick="emergencyStop()">紧急停止</button>` : ""}
+        </div>
+      </div>
+      <div class="card"><h2>最近风控事件</h2>
+        ${(events.items || []).length ? events.items.map(e => `
+          <div class="list-item">
+            <div class="li-top"><b>${esc(e.code)}</b><span class="status ${esc(e.severity)}">${esc(e.severity)}</span></div>
+            <div class="li-sub">${esc(e.message)}${e.symbol ? " · " + esc(e.symbol) : ""} · ${ago(e.created_at)}</div>
+          </div>`).join("") : '<div class="mutedbox">暂无风控事件</div>'}
+      </div>
+      <div class="card"><h2>最近风控决策</h2>
+        ${(decisions.items || []).length ? decisions.items.map(d => `
+          <div class="list-item">
+            <div class="li-top"><b>${d.approved ? "通过" : "拒绝"}</b><span class="li-sub">${ago(d.created_at)}</span></div>
+            <div class="li-sub">${(d.reason_codes || []).map(esc).join("、") || "无拒绝原因"}</div>
+          </div>`).join("") : '<div class="mutedbox">暂无决策记录</div>'}
+      </div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="card"><div class="mutedbox">加载失败：${esc(e.message)}</div></div>`;
+  }
+}
+
+/* ---------- strategies ---------- */
+async function loadStrategies() {
+  const el = $("p-strategies");
+  try {
+    const data = await api("/strategies?limit=50");
+    let reviewMarkup = "";
+    if (S.me?.is_admin) {
+      const reviewRows = [];
+      for (const strategy of (data.items || []).filter(x => x.state === "SHADOW" && x.created_by !== S.me.username)) {
+        try {
+          const versions = await api(`/strategies/${strategy.id}/versions`);
+          for (const version of versions.filter(v => !v.is_approved)) reviewRows.push({strategy, version});
+        } catch (_) { /* inaccessible versions are not offered for approval */ }
+      }
+      reviewMarkup = `<div class="card"><h2>独立策略审批</h2><div class="li-sub">仅展示其他用户的 SHADOW 策略版本；审批前仍由后端核验所有者风险政策和样本外/PAPER 证据。</div>${reviewRows.length ? reviewRows.map(({strategy, version}) => `<div class="list-item"><div class="li-top"><b>${esc(strategy.name)} · v${version.version}</b><span class="status">待独立审批</span></div><div class="li-sub">${esc(version.change_note || "无版本说明")} · ${esc(strategy.created_by || "未知所有者")}</div><button class="btn small primary" onclick="approveStrategyVersion('${strategy.id}','${version.id}')">审批该版本</button></div>`).join("") : '<div class="mutedbox">暂无可审批的其他用户策略版本</div>'}</div>`;
+    }
+    el.innerHTML = `
+      ${reviewMarkup}
+      <div class="card"><h2>策略库</h2>
+        <div class="li-sub" style="margin-bottom:10px">策略经过 RESEARCH → BACKTEST → PAPER → SHADOW → APPROVED → ACTIVE 的生命周期；只有 ACTIVE 策略可被托管引用。</div>
+        ${(data.items || []).length ? data.items.map(s => `
+          <div class="list-item">
+            <div class="li-top"><b>${esc(s.name)}</b><span class="status ${esc(s.state)}">${esc(s.state)}</span></div>
+            <div class="li-sub">${esc(s.symbols?.join(", ") || "—")} · ${esc(s.interval)} · ${esc(s.description || "无描述")}</div>
+          </div>`).join("") : '<div class="mutedbox">暂无策略</div>'}
+      </div>
+      <div class="card"><h2>新建策略草案</h2>
+        <div class="field"><label>名称</label><input id="st-name" placeholder="例如 趋势跟随 v1"></div>
+        <div class="field"><label>交易对（逗号分隔）</label><input id="st-symbols" value="BTCUSDT"></div>
+        <div class="grid2">
+          <div class="field"><label>周期</label><select id="st-interval"><option>15m</option><option>1h</option><option>4h</option><option>1d</option></select></div>
+          <div class="field"><label>说明</label><input id="st-desc" placeholder="可选"></div>
+        </div>
+        <button class="btn" onclick="createStrategy()">创建草案</button>
+      </div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="card"><div class="mutedbox">加载失败：${esc(e.message)}</div></div>`;
+  }
+}
+
+async function approveStrategyVersion(strategyId, versionId) {
+  if (!confirm("确认以独立管理员身份审批此策略版本？后端还会检查策略所有者的风险政策和审批证据。")) return;
+  try {
+    await api(`/strategies/${strategyId}/state`, {method:"POST", body:JSON.stringify({state:"APPROVED", version_id:versionId, note:"Independent administrator review"})});
+    toast("策略版本已通过审批");
+    loadStrategies();
+  } catch (e) { toast("审批未通过：" + e.message); }
+}
+async function createStrategy() {
+  const name = $("st-name").value.trim();
+  if (name.length < 3) return toast("策略名称至少 3 个字符");
+  const symbols = $("st-symbols").value.split(",").map(s => s.trim().toUpperCase()).filter(Boolean);
+  try {
+    await api("/strategies", { method: "POST", body: JSON.stringify({
+      name, symbols, interval: $("st-interval").value,
+      description: $("st-desc").value.trim() || null,
+    }) });
+    toast("策略草案已创建"); loadStrategies();
+  } catch (e) { toast(e.message); }
+}
+
+/* ---------- autopilot ---------- */
+async function loadAutopilot() {
+  const el = $("p-autopilot");
+  try {
+    const [st, strategies] = await Promise.all([
+      api("/autopilot/status"),
+      api("/strategies?limit=100").catch(() => ({ items: [] })),
+    ]);
+    const c = st.config;
+    S.apMode = c.execution_mode || "PAPER";
+    if (!el.dataset.ready) {
+      el.innerHTML = `
+        <div class="notice">AI 全权托管：六个 AI 每次合议后，若结论为交易且通过风控，将自动开仓；成交后立即在交易所挂止损/止盈，服务端持续盯盘并自动平仓。模拟盘不使用真实资金；测试网/主网使用你自己的 Binance API Key。</div>
+        <div class="card"><h2>执行账户</h2>
+          <div class="mode-grid" id="ap-modes">
+            <div class="mode-card" data-mode="PAPER" onclick="pickMode('PAPER')"><b>模拟盘</b><span>内部撮合<br>不碰真实资金</span></div>
+            <div class="mode-card" data-mode="TESTNET" onclick="pickMode('TESTNET')"><b>测试网</b><span>Binance Testnet<br>需要测试网 Key</span></div>
+            <div class="mode-card" data-mode="MAINNET" onclick="pickMode('MAINNET')"><b>主网</b><span>真实资金<br>需服务端解锁 + TOTP</span></div>
+          </div>
+          <div class="field"><label>启用自动分析</label>
+            <select id="ap-enabled"><option value="1">开启</option><option value="0">关闭</option></select></div>
+          <div class="field"><label>自动开仓 / 止盈止损 / 平仓</label>
+            <select id="ap-exec"><option value="1">全权托管</option><option value="0">只分析不下单</option></select></div>
+          <div class="grid2">
+            <div class="field"><label>交易对（逗号分隔）</label><input id="ap-symbols" placeholder="BTCUSDT,ETHUSDT"></div>
+            <div class="field"><label>K线周期</label>
+              <select id="ap-interval">${["5m","15m","30m","1h","4h"].map(i => `<option value="${i}">${i}</option>`).join("")}</select></div>
+            <div class="field"><label>交易时段</label>
+              <select id="ap-intraday"><option value="1">日内（当天平仓）</option><option value="0">允许隔夜</option></select></div>
+            <div class="field"><label>最长持仓（分钟）</label><input id="ap-hold" type="number" min="15" max="1440" step="15"></div>
+            <div class="field"><label>分析间隔（秒）</label><input id="ap-cycle" type="number" min="60" max="86400" step="60"></div>
+            <div class="field"><label>每日最大交易数</label><input id="ap-maxtrades" type="number" min="1" max="50"></div>
+            <div class="field"><label>最小置信度</label><input id="ap-minconf" type="number" min="0" max="1" step="0.05"></div>
+            <div class="field"><label>跟随策略</label>
+              <select id="ap-strategy"><option value="">AI 自由抉择</option>
+                ${(strategies.items || []).filter(s => s.state !== "RETIRED").map(s => `<option value="${s.id}">${esc(s.name)}（${esc(s.state)}）</option>`).join("")}
+              </select></div>
+          </div>
+          <button class="btn" onclick="saveAutopilot()">保存托管设置</button>
+        </div>
+        <div class="card"><h2>运行状态</h2><div id="ap-status"></div></div>
+        <div class="card"><h2>真实持仓 · 自动止盈止损</h2><div id="ap-live"></div></div>
+        <div class="card"><h2>模拟持仓</h2><div id="ap-positions"></div></div>
+        <div class="card"><h2>最近自动分析</h2><div id="ap-runs"></div></div>`;
+      el.dataset.ready = "1";
+    }
+    pickMode(S.apMode, true);
+    $("ap-enabled").value = c.enabled ? "1" : "0";
+    $("ap-exec").value = c.auto_execute ? "1" : "0";
+    if (document.activeElement !== $("ap-symbols")) $("ap-symbols").value = (c.symbols || []).join(",");
+    $("ap-interval").value = c.interval;
+    $("ap-intraday").value = c.intraday ? "1" : "0";
+    $("ap-hold").value = c.max_holding_minutes;
+    $("ap-cycle").value = c.cycle_seconds;
+    $("ap-maxtrades").value = c.max_trades_per_day;
+    $("ap-minconf").value = c.min_confidence;
+    $("ap-strategy").value = c.strategy_id || "";
+    $("ap-status").innerHTML = `
+      <div class="row"><span class="label">托管状态</span><span class="val ${c.enabled ? "up" : "muted"}">${c.enabled ? (c.auto_execute ? "全权托管中" : "仅分析") : "已关闭"}</span></div>
+      <div class="row"><span class="label">执行账户</span><span class="val">${esc(c.execution_mode)}</span></div>
+      <div class="row"><span class="label">上次运行</span><span class="val">${c.last_run_at ? ago(c.last_run_at) : "从未运行"}</span></div>
+      <div class="row"><span class="label">今日已开仓</span><span class="val">${c.trades_today} / ${c.max_trades_per_day}</span></div>
+      <div class="row"><span class="label">今日已实现盈亏</span><span class="val ${cls(st.today_realized_pnl_usd)}">${money(st.today_realized_pnl_usd)}</span></div>
+      <div class="row"><span class="label">累计已平仓</span><span class="val">${st.total_trades}</span></div>
+      ${c.last_error ? `<div class="row"><span class="label">最近错误</span><span class="val warn">${esc(c.last_error)}</span></div>` : ""}`;
+    $("ap-live").innerHTML = (st.live_positions || []).length
+      ? st.live_positions.map(p => `
+        <div class="list-item">
+          <div class="li-top"><b>${esc(p.symbol)} ${esc(p.position_side)} ${p.leverage}x</b>
+            <span class="status ${p.protection_status === "ACTIVE" ? "OK" : "VETO"}">${esc(p.protection_status)}</span></div>
+          <div class="li-sub">${n(p.quantity, 6)} · 开仓 ${n(p.entry_price, 4)} · 止损 ${p.stop_loss ? n(p.stop_loss, 4) : "—"} · 止盈 ${p.take_profit ? n(p.take_profit, 4) : "—"}</div>
+          <div class="inline" style="margin-top:8px"><button class="btn small danger" onclick="closeLive('${p.id}','${esc(p.symbol)}')">立即平仓</button></div>
+        </div>`).join("")
+      : '<div class="mutedbox">暂无真实持仓</div>';
+    $("ap-positions").innerHTML = (st.open_positions || []).length
+      ? st.open_positions.map(p => `
+        <div class="list-item">
+          <div class="li-top"><b>${esc(p.symbol)} ${esc(p.position_side)} ${p.leverage}x</b><span>${n(p.quantity, 6)}</span></div>
+          <div class="li-sub">开仓 ${n(p.entry_price, 4)} · 止损 ${p.stop_loss ? n(p.stop_loss, 4) : "—"} · 止盈 ${p.take_profit ? n(p.take_profit, 4) : "—"} · ${ago(p.opened_at)}</div>
+        </div>`).join("")
+      : '<div class="mutedbox">暂无模拟持仓</div>';
+    $("ap-runs").innerHTML = (st.recent_runs || []).length
+      ? st.recent_runs.map(r => `
+        <div class="list-item">
+          <div class="li-top"><b>${esc(r.symbol)}</b>
+            <span class="status ${esc(r.verdict || "")}">${esc(r.verdict || "—")}${r.confidence !== null && r.confidence !== undefined ? " " + n(Number(r.confidence) * 100, 0) + "%" : ""}</span></div>
+          <div class="li-sub">${ago(r.started_at)} · ${esc((r.summary || "").slice(0, 120))}</div>
+        </div>`).join("")
+      : '<div class="mutedbox">暂无自动分析记录</div>';
+  } catch (e) {
+    if (!el.dataset.ready) el.innerHTML = `<div class="card"><div class="mutedbox">加载失败：${esc(e.message)}</div></div>`;
+  }
+}
+function pickMode(mode, silent) {
+  S.apMode = mode;
+  document.querySelectorAll("#ap-modes .mode-card").forEach(x => x.classList.toggle("active", x.dataset.mode === mode));
+  if (!silent && mode !== "PAPER") toast(mode === "MAINNET" ? "主网使用真实资金，保存时需再次确认" : "测试网使用 Binance 测试资金");
+}
+async function saveAutopilot() {
+  const wantEnabled = $("ap-enabled").value === "1";
+  const wantExec = $("ap-exec").value === "1";
+  const mode = S.apMode;
+  if (wantExec && !wantEnabled) return toast("开启自动开仓前请先启用自动分析");
+  if (wantExec && !confirm(`确认开启 AI 全权托管？
+
+账户：${mode}
+权限：自动开仓、挂止盈止损、自动平仓
+风控：每笔订单仍需通过独立风控引擎
+
+${mode === "MAINNET" ? "⚠ 这是真实资金账户，亏损由你承担。" : mode === "TESTNET" ? "使用 Binance 测试网资金，不涉及真实资产。" : "模拟盘，不使用真实资金。"}`)) return;
+  const symbols = $("ap-symbols").value.split(",").map(s => s.trim().toUpperCase()).filter(Boolean);
+  if (wantEnabled && !symbols.length) return toast("请至少填写一个交易对");
+  const body = {
+    enabled: wantEnabled,
+    auto_execute: wantExec,
+    confirm_auto_execute: wantExec || (mode !== "PAPER" && S.apMode !== "PAPER"),
+    execution_mode: mode,
+    symbols: symbols.length ? symbols : undefined,
+    interval: $("ap-interval").value,
+    intraday: $("ap-intraday").value === "1",
+    max_holding_minutes: Number($("ap-hold").value || 240),
+    cycle_seconds: Number($("ap-cycle").value || 600),
+    max_trades_per_day: Number($("ap-maxtrades").value || 3),
+    min_confidence: Number($("ap-minconf").value || 0.65),
+    strategy_id: $("ap-strategy").value || null,
+  };
+  try {
+    await api("/autopilot", { method: "PUT", body: JSON.stringify(body) });
+    toast("托管设置已保存"); loadAutopilot();
+  } catch (e) { toast(e.message); }
+}
+
+/* ---------- learning ---------- */
+async function loadLearning() {
+  const el = $("p-learning");
+  try {
+    const [perf, lessons] = await Promise.all([
+      api("/learning/performance"),
+      api("/learning/lessons"),
+    ]);
+    const symbols = Object.entries(perf.by_symbol || {});
+    el.innerHTML = `
+      <div class="chips">
+        <span class="chip">交易数 <b>${perf.total_trades}</b></span>
+        <span class="chip">胜率 <b>${perf.win_rate === null ? "—" : n(perf.win_rate * 100, 1) + "%"}</b></span>
+        <span class="chip">平均R <b>${perf.avg_r_multiple === null ? "—" : n(perf.avg_r_multiple, 2)}</b></span>
+        <span class="chip ${cls(perf.total_pnl_usd)}">总盈亏 <b>${money(perf.total_pnl_usd)}</b></span>
+        <span class="chip ${cls(perf.today_pnl_usd)}">今日 <b>${money(perf.today_pnl_usd)}</b></span>
+      </div>
+      <div class="card"><h2>权益曲线（已实现盈亏累计）</h2>
+        ${perf.equity_curve.length ? `<svg class="spark" id="ln-spark" viewBox="0 0 300 56" preserveAspectRatio="none"></svg>` : '<div class="mutedbox">暂无已平仓交易，AI 还没有可学习的结果</div>'}
+      </div>
+      <div class="card"><h2>AI 已学会的经验（${(lessons.items || []).filter(x => x.active).length} 条生效中）</h2>
+        <div class="muted" style="font-size:12px;margin-bottom:8px">服务器每累计 5 笔新结果自动提炼一次经验，生效的经验会注入后续六 AI 合议。可手动停用不准确的经验。</div>
+        <div>
+        ${(lessons.items || []).length ? lessons.items.map(l => `
+          <div class="list-item">
+            <div class="li-top"><span class="status ${l.active ? "OK" : ""}">${l.active ? "生效中" : "已停用"}</span>
+              <span class="li-sub">${esc(l.category)} · 基于 ${l.outcomes_count} 笔 · ${ago(l.created_at)}</span></div>
+            <div class="li-sub" style="color:var(--text);margin-top:4px">${esc(l.lesson)}</div>
+            <div class="inline" style="margin-top:6px"><button class="btn small secondary" onclick="toggleLesson('${l.id}')">${l.active ? "停用" : "启用"}</button></div>
+          </div>`).join("") : '<div class="mutedbox">暂无经验。完成至少 5 笔交易后服务器会自动提炼。</div>'}
+        </div>
+      </div>
+      ${symbols.length ? `
+      <div class="card"><h2>按交易对统计</h2>
+        ${symbols.map(([sym, b]) => `
+          <div class="row"><span class="label">${esc(sym)}</span>
+            <span class="val">${b.trades} 笔 · 胜率 ${b.win_rate === null ? "—" : n(b.win_rate * 100, 0) + "%"} · <span class="${cls(b.pnl_usd)}">${money(b.pnl_usd)}</span></span></div>`).join("")}
+      </div>` : ""}
+      <div class="card"><h2>最近交易结果</h2>
+        ${(perf.recent_outcomes || []).length ? perf.recent_outcomes.map(o => `
+          <div class="list-item">
+            <div class="li-top"><b>${esc(o.symbol)} ${esc(o.position_side)}</b>
+              <span class="${cls(o.pnl_usd)}">${money(o.pnl_usd)}${o.r_multiple !== null ? " (" + n(o.r_multiple, 2) + "R)" : ""}</span></div>
+            <div class="li-sub">${esc(o.exit_reason)} · ${o.regime ? esc(o.regime) + " · " : ""}开仓 ${n(o.entry_price, 4)} → 平仓 ${n(o.exit_price, 4)} · ${ago(o.closed_at)}</div>
+          </div>`).join("") : '<div class="mutedbox">暂无交易结果</div>'}
+      </div>`;
+    if (perf.equity_curve.length) drawEquity($("ln-spark"), perf.equity_curve.map(p => Number(p.equity)));
+  } catch (e) {
+    el.innerHTML = `<div class="card"><div class="mutedbox">加载失败：${esc(e.message)}</div></div>`;
+  }
+}
+function drawEquity(svg, values) {
+  if (!svg || !values.length) return;
+  const min = Math.min(...values), max = Math.max(...values), span = (max - min) || 1;
+  const pts = values.map((v, i) => `${(i / (values.length - 1 || 1)) * 300},${52 - ((v - min) / span) * 48}`).join(" ");
+  const color = values[values.length - 1] >= values[0] ? "#0ecb81" : "#f6465d";
+  const zero = values.some(v => v < 0) && values.some(v => v > 0)
+    ? `<line x1="0" x2="300" y1="${52 - ((0 - min) / span) * 48}" y2="${52 - ((0 - min) / span) * 48}" stroke="#2b3542" stroke-width="0.6" stroke-dasharray="3 3"/>`
+    : "";
+  svg.innerHTML = `${zero}<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.6" vector-effect="non-scaling-stroke"/>`;
+}
+async function toggleLesson(id) {
+  try {
+    await api("/learning/lessons/" + id + "/toggle", { method: "POST" });
+    loadLearning();
+  } catch (e) { toast(e.message); }
+}
+
+/* ---------- factors ---------- */
+async function loadResearchLab() {
+  const el = $("p-research-lab");
+  el.innerHTML = `<div class="page-head"><div><div class="eyebrow">AUTONOMOUS RESEARCH LAB</div><h2>自主量化研究实验室</h2><p class="muted">后台任务、因子验证、策略候选与 PAPER 观察。研究模块与交易所订单执行隔离。</p></div></div>
+    <div class="card"><h3>发起因子研究</h3><div class="grid2">
+      <div class="field"><label>交易对</label><input id="rl-symbol" value="BTCUSDT"></div>
+      <div class="field"><label>周期</label><select id="rl-interval"><option>15m</option><option>5m</option><option>1h</option><option>4h</option><option>1d</option></select></div>
+      <div class="field"><label>预测周期（K线根数）</label><input id="rl-horizon" type="number" min="1" max="100" value="8"></div>
+    </div><button class="btn primary" onclick="enqueueResearchTask()">加入后台研究队列</button></div>
+    <div class="grid2"><div class="card"><h3>研究任务</h3><div id="rl-tasks" class="stack">加载中…</div></div>
+    <div class="card"><h3>策略候选</h3><div id="rl-candidates" class="stack">加载中…</div></div></div>
+    <div class="card"><h3>策略横向比较</h3><div id="rl-compare" class="stack">加载中…</div></div>
+    <div class="card"><h3>PAPER 并行观察账户</h3><div id="rl-paper" class="stack">加载中…</div></div>
+    <div class="card"><h3>PAPER 模拟交易明细（最近 5 个账户）</h3><div id="rl-paper-trades" class="stack">加载中…</div></div>
+    <div class="notice">安全边界：候选策略不会自动发布或创建主网订单；正式策略仍需经过回测、PAPER 观察和人工审批。</div>`;
+  try {
+    const [tasks, candidates, sessions, comparison] = await Promise.all([
+      api("/factors/research/tasks"), api("/research-lab/candidates"),
+      api("/research-lab/paper/sessions"), api("/research-lab/compare")
+    ]);
+    const paperTrades = (await Promise.all(sessions.slice(0, 5).map(async session => {
+      try { return await api(`/research-lab/paper/sessions/${session.id}/trades`); }
+      catch (_) { return []; }
+    }))).flat();
+    $("rl-tasks").innerHTML = tasks.length ? tasks.map(t => `<div class="list-row"><b>${esc(t.symbol)} · ${esc(t.interval)}</b><span class="status ${esc(t.status)}">${esc(t.status)}</span><small>${dt(t.created_at)} · 尝试 ${t.attempts}</small>${t.error ? `<small class="down">${esc(t.error)}</small>` : ""}</div>`).join("") : "暂无任务";
+    $("rl-candidates").innerHTML = candidates.length ? candidates.map(c => { const spec = c.specification || {}; const ev = c.evaluation || {}; return `<div class="list-row"><b>${esc(c.name)}</b><span class="status">${esc(c.status)}</span><small>${esc(spec.strategy_kind || "research candidate")} · ${esc(ev.gate || "RESEARCH_ONLY")} · ${dt(c.created_at)}</small></div>`; }).join("") : "暂无候选策略";
+    $("rl-compare").innerHTML = comparison.length ? comparison.map(x => { const o = x.out_of_sample || {}; const p = x.paper || {}; const pm = p.metrics || {}; return `<div class="list-row"><b>${esc(x.name)} · ${esc(x.strategy_kind)}</b><span class="status ${x.passed ? "ACTIVE" : "WATCH"}">${esc(x.gate)}</span><small>评分 ${n(Number(x.score || 0), 3)} · OOS 收益 ${pct(Number(o.total_return || 0) * 100, 2)} · 夏普 ${n(o.sharpe, 2)} · 最大回撤 ${pct(o.max_drawdown_pct, 2)} · 交易 ${Number(o.trade_count || 0)} 笔</small><small>${p.session_id ? `PAPER ${esc(p.status)} · 权益 ${money(pm.equity ?? p.current_cash)} · 回撤 ${pct(pm.max_drawdown_pct ?? 0, 2)}` : "尚未进入 PAPER 观察"}</small></div>`; }).join("") : "暂无可比较策略";
+    $("rl-paper").innerHTML = sessions.length ? sessions.map(x => { const m = x.metrics || {}; return `<div class="list-row"><b>${esc(x.name)}</b><span class="status ${esc(x.status)}">${esc(x.status)}</span><small>已实现资金 ${money(x.current_cash)} / 初始 ${money(x.initial_cash)}</small><small>权益 ${money(m.equity ?? x.current_cash)} · 未实现 ${money(m.unrealized_pnl ?? 0)} · 最大回撤 ${pct(m.max_drawdown_pct ?? 0, 2)} · 已平仓 ${Number(m.trades || 0)} 笔</small><small>${m.engine === "AUTO_MARKET_PAPER_V1" ? "自动行情驱动 PAPER" : "手动 PAPER"} · ${m.last_processed_candle ? "更新 " + esc(m.last_processed_candle) : "等待行情"}</small></div>`; }).join("") : "暂无 PAPER 观察账户";
+    $("rl-paper-trades").innerHTML = paperTrades.length ? paperTrades.map(t => `<div class="list-row"><b>${esc(t.symbol)} · ${esc(t.side)}</b><span class="status ${esc(t.status)}">${esc(t.status)}</span><small>数量 ${n(t.quantity, 6)} · 入场 ${money(t.entry_price)} · 出场 ${t.exit_price == null ? "未平仓" : money(t.exit_price)}</small><small>手续费 ${money(t.fees)} · PnL ${t.pnl == null ? "未结算" : money(t.pnl)} · ${dt(t.opened_at)}</small></div>`).join("") : "最近 5 个 PAPER 账户暂无模拟交易";
+  } catch (e) {
+    ["rl-tasks","rl-candidates","rl-compare","rl-paper","rl-paper-trades"].forEach(id => $(id).textContent = "加载失败：" + e.message);
+  }
+}
+async function enqueueResearchTask() {
+  try {
+    await api("/factors/research/tasks", {method:"POST", body:JSON.stringify({
+      symbol:$("rl-symbol").value.trim(), interval:$("rl-interval").value,
+      horizon_bars:Number($("rl-horizon").value)
+    })});
+    toast("研究任务已加入队列");
+    loadResearchLab();
+  } catch (e) { toast(e.message); }
+}
+
+async function loadFactors() {
+  const el = $("p-factors");
+  if (!el.dataset.inited) {
+    el.dataset.inited = "1";
+    el.innerHTML = `
+      <div class="card">
+        <h2>因子研究 · 发起一次研究</h2>
+        <div class="muted" style="font-size:12px;margin-bottom:10px">六个 AI 分别提出候选因子，服务器用历史 K 线计算 IC、ICIR、命中率与覆盖率并决定是否收录进因子库。通过验证且处于 ACTIVE 的因子会进入实时信号计算，并作为证据传入六 AI 决策上下文；因子本身不会绕过风控直接下单。</div>
+        <div class="grid2">
+          <div class="field"><label>交易对</label><input id="fa-symbol" value="BTCUSDT" placeholder="BTCUSDT"></div>
+          <div class="field"><label>K 线周期</label>
+            <select id="fa-interval">
+              <option>5m</option><option selected>15m</option><option>1h</option><option>4h</option><option>1d</option>
+            </select></div>
+        </div>
+        <div class="field"><label>预测视界（K 线根数）</label><input id="fa-horizon" type="number" min="1" max="64" value="8"></div>
+        <button class="btn" id="fa-run-btn" onclick="runFactorResearch()">∑　开始研究</button>
+      </div>
+      <div id="fa-report"></div>
+      <div class="card">
+        <h2>因子信号与策略进化</h2>
+        <div class="notice">实时因子信号由 ACTIVE 因子与已收盘 K 线计算，按 IC / ICIR 基础权重叠加市场状态乘数，再交给六 AI 作为决策证据。策略进化当前为 SHADOW_RESEARCH_ONLY：只提出研究候选，不会自动修改策略参数、风控限额或创建订单。</div>
+        <div class="chips"><span class="chip">市场状态 <b>TRENDING / RANGING / HIGH_VOLATILITY / UNKNOWN</b></span><span class="chip">策略自动改参 <b>关闭</b></span><span class="chip">自动下单 <b>关闭</b></span></div>
+        <div class="inline"><button class="btn small secondary" id="fa-lifecycle-btn" onclick="refreshFactorLifecycle()">↻　复核因子生命周期</button></div>
+        <div id="fa-lifecycle-result" class="li-sub" style="margin-top:10px">生命周期复核由你手动触发；不会在打开页面时自动执行。</div>
+      </div>
+      <div class="card">
+        <h2>当前公式目录 · 11 种白名单公式</h2>
+        <div class="chips"><span class="chip">MOMENTUM</span><span class="chip">MEAN_REVERSION_Z</span><span class="chip">VOLATILITY_RATIO</span><span class="chip">VOLUME_Z</span><span class="chip">RSI_DEVIATION</span><span class="chip">EMA_SLOPE</span><span class="chip">RANGE_POSITION</span><span class="chip">VOL_ADJUSTED_MOMENTUM</span><span class="chip">PRICE_VOLUME_CONFIRMATION</span><span class="chip">TREND_EFFICIENCY</span><span class="chip">BREAKOUT_PRESSURE</span></div>
+        <div class="li-sub">LLM 只能从目录中选择公式与参数，不能提交任意 Python、SQL 或可执行表达式。</div>
+      </div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+          <h2 style="margin:0">因子库</h2>
+          <div class="inline" style="margin:0"><button class="btn small secondary" onclick="loadFactorLibrary()">刷新</button></div>
+        </div>
+        <div class="field" style="margin-top:10px"><label>按交易对筛选（留空 = 全部）</label>
+          <input id="fa-filter" value="BTCUSDT" placeholder="例如 BTCUSDT" oninput="loadFactorLibrary(true)"></div>
+        <div id="fa-library"><div class="mutedbox">加载中…</div></div>
+      </div>`;
+    loadFactorLibrary();
+  }
+}
+function fmtIc(v) {
+  const x = Number(v);
+  if (!isFinite(x)) return "—";
+  const c = x > 0.02 ? "up" : x < -0.02 ? "down" : "";
+  return `<span class="${c}">${n(x, 4)}</span>`;
+}
+async function runFactorResearch() {
+  const btn = $("fa-run-btn"), out = $("fa-report");
+  const body = {
+    symbol: ($("fa-symbol").value || "BTCUSDT").trim().toUpperCase(),
+    interval: $("fa-interval").value,
+    horizon_bars: Math.max(1, Math.min(64, Number($("fa-horizon").value || 8))),
+  };
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> 研究进行中…';
+  out.innerHTML = "";
+  try {
+    const r = await api("/factors/research", { method: "POST", body: JSON.stringify(body) });
+    const evalRow = (ev) => `
+      <div class="list-item">
+        <div class="li-top"><b>${esc(ev.factor_name)}</b>
+          <span class="status ${ev.accepted ? "OK" : "REJECTED"}">${ev.accepted ? "已收录" : "未通过"}</span></div>
+        <div class="li-sub">${esc(ev.domain)} · ${esc(ev.agent)} · IC ${fmtIc(ev.ic_mean)} · ICIR ${n(ev.ic_ir, 2)} · 命中率 ${pct(ev.hit_rate * 100, 1)} · 覆盖率 ${pct(ev.coverage * 100, 1)}</div>
+        ${(ev.notes || []).length ? `<div class="li-sub">${ev.notes.map(x => esc(x)).join(" · ")}</div>` : ""}
+      </div>`;
+    out.innerHTML = `
+      <div class="card">
+        <h2>研究报告 · ${esc(r.symbol)} ${esc(r.interval)} · 视界 ${esc(r.horizon_bars)} 根</h2>
+        <div class="chips">
+          <span class="chip">收录 <b>${r.accepted_count}</b></span>
+          <span class="chip">淘汰 <b>${r.rejected_count}</b></span>
+          ${r.degraded ? '<span class="chip bad">数据降级</span>' : '<span class="chip ok">数据完整</span>'}
+        </div>
+        ${(r.reasons || []).length ? `<div class="notice">降级原因：${r.reasons.map(x => esc(x)).join("；")}</div>` : ""}
+        <div class="card" style="margin-bottom:12px"><h2>候选因子（AI 提案）</h2>
+          ${(r.proposals || []).length ? r.proposals.map(p => `
+            <div class="list-item">
+              <div class="li-top"><b>${esc(p.factor_name)}</b>
+                <span class="status ${p.direction === "POSITIVE" ? "OK" : "PENDING"}">${p.direction === "POSITIVE" ? "正向" : "反向"}</span></div>
+              <div class="li-sub">${esc(p.agent)} · ${esc(p.domain)} · 回看 ${p.lookback_bars} 根</div>
+              <div class="li-sub" style="color:var(--text);margin-top:4px">${esc(p.hypothesis)}</div>
+            </div>`).join("") : '<div class="mutedbox">本次没有产生候选因子</div>'}
+        </div>
+        <h2>评估结果</h2>
+        ${(r.evaluations || []).length ? r.evaluations.map(evalRow).join("") : '<div class="mutedbox">没有评估结果</div>'}
+      </div>`;
+    loadFactorLibrary();
+  } catch (e) {
+    out.innerHTML = `<div class="card"><div class="mutedbox">研究失败：${esc(e.message)}</div></div>`;
+  } finally {
+    btn.disabled = false; btn.innerHTML = "∑　开始研究";
+  }
+}
+let faLibTimer = null;
+async function loadFactorLibrary(skipDebounce) {
+  const box = $("fa-library");
+  if (!box) return;
+  const run = async () => {
+    const sym = ($("fa-filter")?.value || "").trim().toUpperCase();
+    try {
+      const data = await api("/factors/library" + (sym ? "?symbol=" + encodeURIComponent(sym) : ""));
+      const items = data.items || [];
+      box.innerHTML = items.length ? items.map(f => `
+        <div class="list-item">
+          <div class="li-top"><b>${esc(f.factor_name)}</b>
+            <span class="status ${f.status === "ACTIVE" ? "OK" : f.status === "WATCH" ? "PENDING" : ""}">${f.status === "ACTIVE" ? "生效中" : f.status === "WATCH" ? "观察中" : esc(f.status || "未知")}</span></div>
+          <div class="li-sub">${esc(f.symbol)} · ${esc(f.interval)} · ${esc(f.domain)} · ${esc(f.agent)} · ${f.direction === "POSITIVE" ? "正向" : "反向"} · 回看 ${f.lookback_bars} 根</div>
+          <div class="li-sub">IC ${fmtIc(f.ic_mean)} · ICIR ${n(f.ic_ir, 2)} · 命中率 ${pct(f.hit_rate * 100, 1)} · ${ago(f.created_at)}</div>
+          ${f.hypothesis ? `<div class="li-sub" style="color:var(--text);margin-top:4px">${esc(f.hypothesis)}</div>` : ""}
+        </div>`).join("") : '<div class="mutedbox">因子库为空。发起一次研究，通过评估的因子会收录在这里。</div>';
+    } catch (e) {
+      box.innerHTML = `<div class="mutedbox">加载失败：${esc(e.message)}</div>`;
+    }
+  };
+  if (skipDebounce) { clearTimeout(faLibTimer); faLibTimer = setTimeout(run, 350); }
+  else await run();
+}
+
+async function refreshFactorLifecycle() {
+  const btn = $("fa-lifecycle-btn"), out = $("fa-lifecycle-result");
+  const symbol = ($("fa-filter")?.value || "").trim().toUpperCase();
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> 正在复核…';
+  try {
+    const url = "/factors/lifecycle/refresh" + (symbol ? "?symbol=" + encodeURIComponent(symbol) : "");
+    const r = await api(url, { method: "POST" });
+    out.textContent = `本次检查 ${Number(r.checked || 0)} 个因子，状态变化 ${Number(r.changed || 0)} 个。`;
+    await loadFactorLibrary();
+    toast("因子生命周期复核完成");
+  } catch (e) {
+    out.textContent = "复核失败：" + e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = "↻　复核因子生命周期";
+  }
+}
+
+/* ---------- notifications ---------- */
+async function loadNotifications() {
+  const el = $("p-notifications");
+  try {
+    const data = await api("/notifications?limit=50");
+    setNotifBadge(data.unread || 0);
+    el.innerHTML = `
+      <div class="card"><h2>通知中心</h2>
+        <div class="inline" style="margin-bottom:8px">
+          <button class="btn small secondary" onclick="markAllRead()">全部已读</button>
+        </div>
+        ${(data.items || []).length ? data.items.map(x => `
+          <div class="list-item" onclick="markRead('${x.id}')" style="cursor:pointer">
+            <div class="li-top"><b>${esc(x.title)}</b>
+              <span class="status ${x.read_at ? "" : "PENDING"}">${x.read_at ? "已读" : "未读"}</span></div>
+            <div class="li-sub" style="color:${x.read_at ? "var(--muted)" : "var(--text)"}">${esc(x.body || "")}</div>
+            <div class="li-sub">${esc(x.kind)} · ${ago(x.created_at)}</div>
+          </div>`).join("") : '<div class="mutedbox">暂无通知</div>'}
+      </div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="card"><div class="mutedbox">加载失败：${esc(e.message)}</div></div>`;
+  }
+}
+async function markRead(id) {
+  try { await api("/notifications/" + id + "/read", { method: "POST" }); loadNotifications(); }
+  catch (e) { toast(e.message); }
+}
+async function markAllRead() {
+  try { await api("/notifications/read-all", { method: "POST" }); toast("已全部标记为已读"); loadNotifications(); }
+  catch (e) { toast(e.message); }
+}
+
+/* ---------- me ---------- */
+async function loadMe() {
+  const el = $("p-me");
+  try {
+    const [sys, me] = await Promise.all([
+      api("/system/status").catch(() => null),
+      api("/auth/me").catch(() => null),
+    ]);
+    el.innerHTML = `
+      <div class="card"><h2>账号</h2>
+        <div class="row"><span class="label">用户</span><span class="val">${esc(me?.username || "")}</span></div>
+        <div class="row"><span class="label">角色</span><span class="val">${me?.is_admin ? "管理员" : "普通用户"}</span></div>
+        <div class="row"><span class="label">两步验证</span><span class="val">${me?.totp_enabled ? "已开启" : "未开启"}</span></div>
+      </div>
+      <div class="card"><h2>系统</h2>
+        <div class="row"><span class="label">版本</span><span class="val">${esc(sys?.version || "—")}</span></div>
+        <div class="row"><span class="label">交易模式</span><span class="val">${esc(sys?.trading_mode || "—")}</span></div>
+        <div class="row"><span class="label">主网解锁</span><span class="val">${sys?.mainnet_unlocked ? "是" : "否"}</span></div>
+        <div class="row"><span class="label">数据库 / Redis</span><span class="val">${sys?.database_ok ? "OK" : "FAIL"} / ${sys?.redis_ok ? "OK" : "FAIL"}</span></div>
+        <div class="row"><span class="label">服务器时间</span><span class="val">${dt(sys?.checked_at)}</span></div>
+      </div>
+      <div class="card"><h2>客户端</h2>
+        <a class="btn secondary" style="display:flex;margin-bottom:10px" href="/downloads/aion-debug.apk" download>下载 Android 安装包</a>
+        <button class="btn danger" onclick="logout()">退出登录</button>
+      </div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="card"><div class="mutedbox">加载失败：${esc(e.message)}</div></div>`;
+  }
+}
+async function logout() {
+  try { await api("/auth/logout", { method: "POST", body: JSON.stringify({ all_devices: false }) }); }
+  catch (_) { /* ignore */ }
+  showLogin();
+}
+
+/* ---------- exchange ---------- */
+function _exchangeRow(mode, it, configured) {
+  return `
+    <div class="list-item">
+      <div class="li-top"><b>${mode}</b>
+        <span class="status ${configured ? "OK" : "REJECTED"}">${configured ? "已配置" : "未配置"}</span></div>
+      <div class="li-sub">Key ${it?.has_api_key ? "已保存" : "未保存"} · Secret ${it?.has_api_secret ? "已保存" : "未保存"}
+        ${it?.last_checked_at ? " · 验证于 " + ago(it.last_checked_at) : ""}</div>
+      <div class="inline" style="margin-top:8px">
+        <button class="btn small secondary" onclick="delExchange('${mode}')" ${it ? "" : "disabled"}>删除</button>
+      </div>
+    </div>`;
+}
+async function loadExchange() {
+  const el = $("p-exchange");
+  try {
+    const st = await api("/settings/exchange");
+    const byMode = Object.fromEntries((st.items || []).map(x => [x.mode, x]));
+    el.innerHTML = `
+      <div class="card"><h2>对接 Binance Futures</h2>
+        <div class="field"><label>模式</label><select id="x-mode">
+          <option value="TESTNET">TESTNET（测试网）</option><option value="MAINNET">MAINNET（主网）</option></select></div>
+        <div class="field"><label>API Key</label><input id="x-key" autocomplete="off" placeholder="粘贴 Binance API Key"></div>
+        <div class="field"><label>API Secret</label><input id="x-secret" type="password" autocomplete="off" placeholder="粘贴 Binance API Secret"></div>
+        <label class="li-sub" style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <input type="checkbox" id="x-verify" checked style="width:auto"> 保存时联网验证密钥</label>
+        <button class="btn" id="x-btn" onclick="saveExchange()">保存</button>
+        <div id="x-result"></div>
+        <div class="li-sub" style="margin-top:8px">密钥在服务端加密存储，仅本人可见；建议使用只开合约交易、关闭提现权限的 API Key。AI 托管只会在你授权的模式下使用它。</div>
+      </div>
+      <div class="card"><h2>我的已保存凭据</h2>
+        ${_exchangeRow("TESTNET", byMode.TESTNET, st.configured?.TESTNET)}
+        ${_exchangeRow("MAINNET", byMode.MAINNET, st.configured?.MAINNET)}
+      </div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="card"><div class="mutedbox">加载失败：${esc(e.message)}</div></div>`;
+  }
+}
+async function saveExchange() {
+  const btn = $("x-btn");
+  const key = $("x-key").value.trim(), secret = $("x-secret").value.trim();
+  if (!key || !secret) return toast("请填写 API Key 和 Secret");
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> 保存中';
+  try {
+    const r = await api("/settings/exchange", {
+      method: "PUT",
+      body: JSON.stringify({ mode: $("x-mode").value, api_key: key, api_secret: secret, verify: $("x-verify").checked }),
+    });
+    $("x-result").innerHTML = `
+      <div class="sep"></div>
+      <div class="row"><span class="label">保存</span><span class="val up">成功</span></div>
+      <div class="row"><span class="label">联网验证</span>
+        <span class="val ${r.verified ? "up" : "warn"}">${r.verified ? "通过" : "未通过"}</span></div>
+      <div class="li-sub">${esc(r.message)}</div>`;
+    toast("已保存");
+    setTimeout(loadExchange, 800);
+  } catch (e) {
+    $("x-result").innerHTML = `<div class="sep"></div><div class="down" style="font-size:13px">保存失败：${esc(e.message)}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = "保存";
+  }
+}
+async function delExchange(mode) {
+  if (!confirm(`确认删除 ${mode} 的 Binance 凭据？`)) return;
+  try { await api("/settings/exchange/" + mode, { method: "DELETE" }); toast("已删除"); loadExchange(); }
+  catch (e) { toast(e.message); }
+}
+
+/* ---------- users (admin) ---------- */
+async function loadUsers() {
+  const el = $("p-users");
+  try {
+    const [data, me] = await Promise.all([api("/users"), api("/auth/me")]);
+    el.innerHTML = `
+      <div class="card"><h2>创建用户</h2>
+        <div class="field"><label>用户名</label><input id="u-name" autocomplete="off" placeholder="3-64 位字母/数字/._-"></div>
+        <div class="field"><label>初始密码（至少 12 位）</label><input id="u-pass" type="password" autocomplete="new-password"></div>
+        <label class="li-sub" style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <input type="checkbox" id="u-admin" style="width:auto"> 创建为管理员</label>
+        <button class="btn" id="u-btn" onclick="createUser()">创建用户</button>
+      </div>
+      <div class="card"><h2>用户列表 · ${data.total}</h2>
+        ${(data.items || []).map(u => `
+          <div class="list-item">
+            <div class="li-top"><b>${esc(u.username)}${u.id === me.id ? ' <span class="muted">(我)</span>' : ""}</b>
+              <span class="status ${u.is_active ? "OK" : "REJECTED"}">${u.is_admin ? "管理员" : "普通用户"} · ${u.is_active ? "启用" : "禁用"}</span></div>
+            <div class="li-sub">最近登录 ${ago(u.last_login_at)} · 创建于 ${dt(u.created_at)}</div>
+            <div class="inline" style="margin-top:8px">
+              <button class="btn small secondary" onclick="toggleUser('${u.id}', ${!u.is_active})">${u.is_active ? "禁用" : "启用"}</button>
+              <button class="btn small secondary" onclick="resetUserPassword('${u.id}')">重置密码</button>
+              <button class="btn small danger" onclick="deleteUser('${u.id}', '${esc(u.username)}')">删除</button>
+            </div>
+          </div>`).join("")}
+      </div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="card"><div class="mutedbox">加载失败：${esc(e.message)}</div></div>`;
+  }
+}
+async function createUser() {
+  const btn = $("u-btn");
+  const body = { username: $("u-name").value.trim(), password: $("u-pass").value, is_admin: $("u-admin").checked };
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> 创建中';
+  try { await api("/users", { method: "POST", body: JSON.stringify(body) }); toast("用户已创建"); loadUsers(); }
+  catch (e) { toast(e.message); }
+  finally { btn.disabled = false; btn.textContent = "创建用户"; }
+}
+async function toggleUser(id, active) {
+  try { await api("/users/" + id, { method: "PATCH", body: JSON.stringify({ is_active: active }) }); toast(active ? "已启用" : "已禁用"); loadUsers(); }
+  catch (e) { toast(e.message); }
+}
+async function resetUserPassword(id) {
+  const password = prompt("输入新密码（至少 12 位）");
+  if (!password) return;
+  try { await api("/users/" + id + "/password", { method: "POST", body: JSON.stringify({ password }) }); toast("密码已重置，该用户需重新登录"); }
+  catch (e) { toast(e.message); }
+}
+async function deleteUser(id, name) {
+  if (!confirm(`确认删除用户 ${name}？该操作不可撤销。`)) return;
+  try { await api("/users/" + id, { method: "DELETE" }); toast("已删除"); loadUsers(); }
+  catch (e) { toast(e.message); }
+}
+
+/* ---------- models (admin) ---------- */
+const MODEL_BRANDS = [
+  { id: "openai", label: "ChatGPT", kind: "openai", base: "https://api.openai.com/v1", light: "gpt-4o-mini", heavy: "gpt-4o", img: "chatgpt" },
+  { id: "anthropic", label: "Claude", kind: "anthropic", base: "https://api.anthropic.com", light: "claude-sonnet-4-20250514", heavy: "claude-opus-4-1", img: "claude" },
+  { id: "deepseek", label: "DeepSeek", kind: "deepseek", base: "https://api.deepseek.com/v1", light: "deepseek-chat", heavy: "deepseek-reasoner", img: "deepseek" },
+  { id: "gemini", label: "Gemini", kind: "gemini", base: "https://generativelanguage.googleapis.com/v1beta/openai/", light: "gemini-2.0-flash", heavy: "gemini-2.5-pro", img: "gemini" },
+  { id: "xai", label: "Grok", kind: "xai", base: "https://api.x.ai/v1", light: "grok-3-mini", heavy: "grok-4", img: "grok" },
+  { id: "moonshot", label: "Kimi", kind: "moonshot", base: "https://api.moonshot.cn/v1", light: "moonshot-v1-8k", heavy: "kimi-k2-0711-preview", img: "kimi" },
+  { id: "minimax", label: "MiniMax", kind: "minimax", base: "https://api.minimax.chat/v1", light: "abab6.5s-chat", heavy: "abab6.5s-chat", img: "minimax" },
+  { id: "qwen", label: "Qwen", kind: "qwen", base: "https://dashscope.aliyuncs.com/compatible-mode/v1", light: "qwen-turbo", heavy: "qwen-max", img: "qwen" },
+];
+
+function pickBrand(id) {
+  const b = MODEL_BRANDS.find(x => x.id === id);
+  if (!b) return;
+  $("mp-name").value = b.label;
+  $("mp-kind").value = b.kind;
+  $("mp-url").value = b.base;
+  $("mp-light").value = b.light;
+  $("mp-heavy").value = b.heavy;
+  document.querySelectorAll(".brand-pick").forEach(el => el.classList.toggle("on", el.dataset.brand === id));
+}
+
+async function loadModels() {
+  const el = $("p-models");
+  try {
+    const [prov, asg, roster] = await Promise.all([
+      api("/models/providers"), api("/models/assignments"), api("/agents/roster"),
+    ]);
+    S.models = { assignments: asg.items || [], roster: roster || [] };
+    const providers = prov.items || [];
+    const users = asg.items || [];
+    const providerOpts = providers.map(p => `<option value="${p.id}">${esc(p.name)} · ${esc(p.kind)}</option>`).join("");
+    el.innerHTML = `
+      <div class="card"><h2>添加大模型 API</h2>
+        <div class="li-sub" style="margin-bottom:8px">先选品牌，自动填入地址与推荐模型；只需再粘贴 API Key。</div>
+        <div class="inline" style="flex-wrap:wrap;gap:6px;margin-bottom:12px">
+          ${MODEL_BRANDS.map(b => `<button type="button" class="btn small secondary brand-pick" data-brand="${b.id}" onclick="pickBrand('${b.id}')"><img src="/site/assets/characters/${b.img}.png" alt="" style="width:20px;height:20px;border-radius:50%;object-fit:cover;margin-right:6px;vertical-align:-5px">${b.label}</button>`).join("")}
+        </div>
+        <div class="grid2">
+          <div class="field"><label>名称</label><input id="mp-name" placeholder="例如 openai-main"></div>
+          <div class="field"><label>类型</label><select id="mp-kind">
+            <option value="openai">ChatGPT / OpenAI</option><option value="anthropic">Claude / Anthropic</option><option value="deepseek">DeepSeek</option><option value="gemini">Gemini</option><option value="xai">Grok / xAI</option><option value="moonshot">Kimi / Moonshot</option><option value="minimax">MiniMax</option><option value="qwen">Qwen / 通义</option></select></div>
+        </div>
+        <div class="field"><label>Base URL（留空使用默认）</label><input id="mp-url" placeholder="https://api.openai.com/v1"></div>
+        <div class="field"><label>API Key</label><input id="mp-key" type="password" autocomplete="off"></div>
+        <div class="grid2">
+          <div class="field"><label>轻量模型</label><input id="mp-light" placeholder="gpt-4o-mini" value="gpt-4o-mini"></div>
+          <div class="field"><label>主力模型</label><input id="mp-heavy" placeholder="gpt-4o" value="gpt-4o"></div>
+        </div>
+        <button class="btn" onclick="createProvider()">保存 Provider</button>
+      </div>
+      <div class="card"><h2>已配置 Provider · ${providers.length}</h2>
+        ${providers.map(p => `
+          <div class="list-item">
+            <div class="li-top"><b style="display:flex;align-items:center;gap:8px"><img src="/site/assets/characters/${(MODEL_BRANDS.find(b => b.kind === p.kind) || {}).img || "chatgpt"}.png" alt="" style="width:24px;height:24px;border-radius:50%;object-fit:cover">${esc(p.name)}</b>
+              <span class="status ${p.is_enabled ? "OK" : "REJECTED"}">${esc(p.kind)} · ${p.is_enabled ? "启用" : "禁用"}</span></div>
+            <div class="li-sub">Key ${esc(p.api_key_masked || "未保存")} · 轻量 ${esc(p.light_model)} · 主力 ${esc(p.heavy_model)}</div>
+            <div class="li-sub">${esc(p.base_url || "默认地址")}</div>
+            <div class="inline" style="margin-top:8px">
+              <button class="btn small secondary" onclick="toggleProvider('${p.id}', ${!p.is_enabled})">${p.is_enabled ? "禁用" : "启用"}</button>
+              <button class="btn small danger" onclick="deleteProvider('${p.id}')">删除</button>
+            </div>
+          </div>`).join("") || '<div class="mutedbox">还没有 Provider</div>'}
+      </div>
+      <div class="card"><h2>分配给用户</h2>
+        ${users.length ? `
+        <div class="field"><label>用户</label><select id="am-user" onchange="fillAssign(this.value)">
+          ${users.map(u => `<option value="${u.user_id}">${esc(u.username)}${u.configured ? " · 已配置" : ""}</option>`).join("")}
+        </select></div>
+        <div class="field"><label>Provider</label><select id="am-provider"><option value="">— 不分配 —</option>${providerOpts}</select></div>
+        <div class="grid2">
+          <div class="field"><label>轻量模型（可留空）</label><input id="am-light"></div>
+          <div class="field"><label>主力模型（可留空）</label><input id="am-heavy"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>每日预算 (USD)</label><input id="am-budget" inputmode="decimal" value="5"></div>
+          <div class="field"><label>启用</label><select id="am-enabled"><option value="1">是</option><option value="0">否</option></select></div>
+        </div>
+        <div class="sep"></div>
+        <h3 style="font-size:14px;margin-bottom:6px">六个 AI 分工与模型</h3>
+        <div class="li-sub" style="margin-bottom:10px">每个 AI 承担固定职责；留空表示使用上面的轻量/主力模型。可给单个 AI 指定更快或更强的模型。</div>
+        ${(roster || []).map(a => `
+          <div class="field">
+            <label>${a.order}. ${esc(a.title)} · ${esc(a.stage)}${a.veto ? " · 一票否决" : ""}</label>
+            <div class="li-sub" style="margin-bottom:6px">${esc(a.purpose)}</div>
+            <input id="am-role-${a.name}" placeholder="留空=默认模型" autocomplete="off">
+          </div>`).join("")}
+        <button class="btn" onclick="saveAssignment()">保存分配</button>
+        <div class="li-sub" style="margin-top:8px">未分配用户的请求会回退到服务器上第一个启用的 Provider（公开部署可用）。</div>`
+        : '<div class="mutedbox">暂无用户</div>'}
+      </div>`;
+    if (users.length) fillAssign(users[0].user_id);
+  } catch (e) {
+    el.innerHTML = `<div class="card"><div class="mutedbox">加载失败：${esc(e.message)}</div></div>`;
+  }
+}
+function fillAssign(userId) {
+  const it = (S.models?.assignments || []).find(x => x.user_id === userId) || {};
+  $("am-provider").value = it.provider_id || "";
+  $("am-light").value = it.light_model || "";
+  $("am-heavy").value = it.heavy_model || "";
+  $("am-budget").value = it.daily_budget_usd ?? "5";
+  $("am-enabled").value = it.enabled ? "1" : "0";
+  (S.models?.roster || []).forEach(a => {
+    const input = $("am-role-" + a.name);
+    if (input) input.value = (it.role_models || {})[a.name] || "";
+  });
+}
+async function createProvider() {
+  const body = {
+    name: $("mp-name").value.trim(), kind: $("mp-kind").value,
+    base_url: $("mp-url").value.trim() || null, api_key: $("mp-key").value.trim(),
+    light_model: $("mp-light").value.trim(), heavy_model: $("mp-heavy").value.trim(),
+  };
+  try { await api("/models/providers", { method: "POST", body: JSON.stringify(body) }); toast("Provider 已保存"); loadModels(); }
+  catch (e) { toast(e.message); }
+}
+async function toggleProvider(id, enabled) {
+  try { await api("/models/providers/" + id, { method: "PATCH", body: JSON.stringify({ is_enabled: enabled }) }); toast(enabled ? "已启用" : "已禁用"); loadModels(); }
+  catch (e) { toast(e.message); }
+}
+async function deleteProvider(id) {
+  if (!confirm("删除该 Provider？已分配的用户会失去访问。")) return;
+  try { await api("/models/providers/" + id, { method: "DELETE" }); toast("已删除"); loadModels(); }
+  catch (e) { toast(e.message); }
+}
+async function saveAssignment() {
+  const userId = $("am-user").value;
+  if (!userId) return toast("请选择用户");
+  const roleModels = {};
+  (S.models?.roster || []).forEach(a => {
+    const input = $("am-role-" + a.name);
+    const value = input ? input.value.trim() : "";
+    if (value) roleModels[a.name] = value;
+  });
+  const body = {
+    provider_id: $("am-provider").value || null,
+    light_model: $("am-light").value.trim() || null,
+    heavy_model: $("am-heavy").value.trim() || null,
+    role_models: roleModels,
+    daily_budget_usd: Number($("am-budget").value || 0),
+    enabled: $("am-enabled").value === "1",
+  };
+  try { await api("/models/assignments/" + userId, { method: "PUT", body: JSON.stringify(body) }); toast("分配已保存"); loadModels(); }
+  catch (e) { toast(e.message); }
+}
+
+/* ---------- boot ---------- */
+$("l-pass").addEventListener("keydown", (e) => { if (e.key === "Enter") authSubmit(); });
+(async function boot() {
+  if (!S.token) return showLogin();
+  showApp();
+  try { await loadIdentity(); switchTab("home"); }
+  catch { showLogin(); }
+})();
+</script>
+</body>
+</html>

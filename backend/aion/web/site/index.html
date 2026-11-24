@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#100d0b">
+<title>AION — 多智能体 AI 合约交易与量化研究系统</title>
+<meta name="description" content="AION 是面向个人研究与交易的多智能体加密货币合约系统，整合六 AI 协作、量化因子研究、独立风控与交易执行。默认 PAPER 模拟盘。">
+<style>
+:root{
+  --bg:#100d0b;--bg2:#19120d;--panel:rgba(31,23,16,.88);--line:rgba(233,163,74,.22);
+  --text:#fff4e8;--muted:#b7a38d;--violet:#d88a45;--blue:#d9a15f;--pink:#e9b47b;
+  --gold:#ffc46b;--glow:0 0 24px rgba(233,163,74,.12);--radius:18px;
+}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:linear-gradient(180deg,#100d0b 0%,#17110d 55%,#100d0b 100%);
+ color:var(--text);font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;overflow-x:hidden}
+a{color:inherit;text-decoration:none}button{font:inherit}
+.container{width:min(1180px,calc(100% - 44px));margin:auto}
+.noise{position:fixed;inset:0;pointer-events:none;opacity:.07;z-index:10;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.28'/%3E%3C/svg%3E")}
+header{position:fixed;top:0;left:0;right:0;z-index:20;background:rgba(8,8,23,.72);backdrop-filter:blur(18px);border-bottom:1px solid rgba(178,160,255,.12)}
+.nav{height:76px;display:flex;align-items:center;justify-content:space-between;gap:24px}
+.brand{display:flex;align-items:center;gap:12px;font-weight:800;letter-spacing:.12em;font-size:22px}
+.brand-mark{width:42px;height:42px;display:block;object-fit:cover;border:1px solid #e9a34a;border-radius:11px;box-shadow:0 3px 12px #0006}
+
+.brand small{display:block;font-size:9px;letter-spacing:.06em;color:#a9a0cb;font-weight:500;margin-top:1px}
+.nav-links{display:flex;align-items:center;gap:28px;color:#c9c1e8;font-size:13px}
+.nav-links a:hover{color:white}
+.nav-cta,.btn{border:1px solid rgba(190,172,255,.42);background:linear-gradient(110deg,#f4c27e,#e9a34a);color:#241508;padding:12px 19px;border-radius:999px;font-weight:800;box-shadow:0 0 24px rgba(144,122,255,.25);cursor:pointer;transition:.25s}
+.nav-cta:hover,.btn:hover{transform:translateY(-2px);box-shadow:0 0 34px rgba(144,122,255,.45)}
+.menu{display:none;background:none;color:white;border:1px solid var(--line);border-radius:10px;padding:9px 12px}
+.hero{min-height:760px;padding:142px 0 82px;position:relative;isolation:isolate;overflow:hidden}
+.hero:before{content:"";position:absolute;inset:90px -10% 0;z-index:-2;background:
+ radial-gradient(ellipse at 68% 44%,rgba(233,163,74,.16),transparent 34%),
+ radial-gradient(ellipse at 82% 60%,rgba(233,163,74,.08),transparent 28%)}
+.hero-grid{display:grid;grid-template-columns:.88fr 1.12fr;gap:35px;align-items:center}
+.eyebrow{display:inline-flex;align-items:center;gap:9px;color:#c8baff;border:1px solid var(--line);background:#17142d88;border-radius:999px;padding:8px 13px;font-size:11px;letter-spacing:.14em}
+.dot{width:7px;height:7px;border-radius:50%;background:#a58cff;box-shadow:0 0 12px #a58cff}
+h1{font-family:Georgia,"Times New Roman",serif;font-size:clamp(76px,10vw,132px);line-height:.9;letter-spacing:-.065em;margin:27px 0 20px;text-shadow:0 0 35px #9278ff45}
+.hero h1 span{background:linear-gradient(100deg,#fff 10%,#c7b3ff 48%,#83d8ff 90%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero h2{font-size:clamp(24px,3vw,37px);line-height:1.4;margin:0 0 18px;font-weight:650;letter-spacing:.03em}
+.hero-copy{max-width:520px;color:#c1badb;line-height:1.9;font-size:14px}
+.hero-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:30px 0 18px}
+.btn.secondary{background:rgba(22,21,49,.7);color:#e8e1ff;box-shadow:none}
+.micro{font-size:11px;color:#9890b7}
+.hero-art{min-height:510px;position:relative;border:1px solid rgba(180,163,255,.23);border-radius:34px;overflow:hidden;background:
+ linear-gradient(140deg,rgba(27,25,67,.4),rgba(9,10,30,.65)),
+ radial-gradient(ellipse at 50% 50%,#5742a966,transparent 58%);
+box-shadow:0 25px 90px #0008,inset 0 0 70px #7761ff16}
+.hero-art:before{content:"";position:absolute;inset:8%;border:1px solid rgba(188,170,255,.16);border-radius:50%;transform:rotate(-18deg) scaleX(1.15)}
+.hero-art:after{content:"";position:absolute;width:360px;height:360px;border-radius:50%;border:1px solid rgba(114,197,255,.22);left:50%;top:49%;transform:translate(-50%,-50%);box-shadow:0 0 60px #705bff24,inset 0 0 60px #705bff20}
+.orbit{position:absolute;left:50%;top:50%;width:460px;height:190px;border:1px solid #9e8cff44;border-radius:50%;transform:translate(-50%,-50%) rotate(-28deg)}
+.orbit.two{transform:translate(-50%,-50%) rotate(28deg);width:420px;height:250px;border-color:#73d4ff3b}
+.core{position:absolute;z-index:2;left:50%;top:50%;transform:translate(-50%,-50%);width:145px;height:145px;border-radius:50%;display:grid;place-items:center;text-align:center;background:radial-gradient(circle,#6c55c8,#1a1749 65%,#0d0d27);border:1px solid #b7a7ff;box-shadow:0 0 28px #917aff,0 0 90px #7355ff88}
+.core strong{font-size:30px;letter-spacing:.1em}.core small{display:block;font-size:9px;color:#d6ceff;letter-spacing:.12em}
+.agent-orb{position:absolute;z-index:3;width:92px;height:92px;border-radius:50%;display:flex;align-items:center;justify-content:center;text-align:center;padding:8px;background:linear-gradient(145deg,#25204e,#10132f);border:1px solid #b3a0ff88;box-shadow:0 0 25px #7e69ff44;font-size:12px;font-weight:750}
+.agent-orb small{display:block;color:#b8b1db;font-size:9px;font-weight:500;margin-top:5px}
+.agent-orb.a1{top:10%;left:13%}.agent-orb.a2{top:7%;right:13%}.agent-orb.a3{top:42%;left:3%}.agent-orb.a4{top:42%;right:3%}.agent-orb.a5{bottom:8%;left:17%}.agent-orb.a6{bottom:8%;right:17%}
+.art-note{position:absolute;z-index:4;bottom:18px;left:20px;color:#aaa2d1;font-size:10px;letter-spacing:.1em}
+.art-spark{position:absolute;color:#d6caff;text-shadow:0 0 15px #b8a2ff;font-size:22px}
+.s1{top:15%;left:48%}.s2{top:28%;right:12%}.s3{bottom:20%;left:44%}
+section{padding:92px 0;position:relative}
+.section-head{max-width:720px;margin-bottom:42px}
+.kicker{font-size:11px;letter-spacing:.2em;color:#a99aff;text-transform:uppercase}
+h3{font-size:clamp(30px,4vw,48px);margin:12px 0 14px;letter-spacing:-.035em}
+.lead{color:var(--muted);line-height:1.9;font-size:14px}
+.intro-panel{display:grid;grid-template-columns:1.1fr .9fr;gap:26px;align-items:stretch}
+.glass{background:linear-gradient(145deg,rgba(32,29,73,.76),rgba(14,15,39,.76));border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--glow);backdrop-filter:blur(16px)}
+.intro-copy{padding:34px}
+.intro-copy p{color:#c2bbdd;line-height:2;font-size:14px}
+.fact-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:26px}
+.fact{padding:17px 14px;border:1px solid #9b8be633;border-radius:15px;background:#ffffff05}
+.fact b{display:block;font-size:22px;color:#d7caff}.fact span{font-size:10px;color:#aaa2c8}
+.arch-mini{padding:26px;display:flex;flex-direction:column;justify-content:center;gap:12px}
+.arch-node{border:1px solid #9b8be655;border-radius:14px;padding:13px 16px;background:#151433;color:#eee9ff;font-size:12px;text-align:center}
+.arch-node small{display:block;color:#a9a1ca;font-size:10px;margin-top:4px}
+.arch-arrow{text-align:center;color:#9c8cff;font-size:18px;line-height:1}
+.agent-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.agent-card{padding:18px;min-height:158px;position:relative;overflow:hidden;transition:.25s}
+.agent-card:hover{transform:translateY(-5px);border-color:#b7a5ff88}
+.agent-card:after{content:"";position:absolute;width:110px;height:110px;border-radius:50%;right:-40px;bottom:-50px;background:radial-gradient(circle,#8c70ff44,transparent 70%)}
+.agent-top{display:flex;align-items:center;gap:13px;margin-bottom:13px}.character-roster{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:0 0 34px}.character{padding:12px;text-align:center;border:1px solid #a18ee944;border-radius:18px;background:linear-gradient(145deg,#1d1a40aa,#101027aa);overflow:hidden}.character-portrait{height:130px;border-radius:12px;background:radial-gradient(ellipse at 50% 30%,#8e7bff55,transparent 70%),linear-gradient(145deg,#29234e,#11132d);border:1px solid #aa9aff44;overflow:hidden;display:grid;place-items:center;color:#cfc5ff;font-family:Georgia,serif;font-size:32px}.character-portrait img{width:100%;height:100%;object-fit:cover;display:block}.character b{display:block;font-size:12px;margin-top:10px}.character small{display:block;font-size:9px;color:#938bb5;margin-top:3px}
+.agent-avatar{width:48px;height:48px;border-radius:15px;display:grid;place-items:center;background:linear-gradient(145deg,#42376f,#171a3e);border:1px solid #b8a8ff66;color:#e9e1ff;font-family:Georgia,serif;font-size:19px;overflow:hidden;flex:0 0 48px}.agent-avatar img{width:100%;height:100%;object-fit:cover;display:block}.agent-avatar .fallback{position:absolute}
+.agent-card h4{margin:0;font-size:15px}.agent-card p{margin:0;color:#aaa3c8;font-size:11px;line-height:1.7}
+.agent-card .role{color:#9f91d5;font-size:9px;letter-spacing:.12em;margin-top:4px}
+.engine-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.engine{padding:25px;min-height:190px;position:relative}
+.engine .num{font-family:Georgia,serif;font-size:36px;color:#8d7aff55;position:absolute;right:23px;top:14px}
+.engine h4{font-size:18px;margin:0 0 12px}.engine p{font-size:12px;color:#b6afd2;line-height:1.8;max-width:470px}
+.tags{display:flex;gap:7px;flex-wrap:wrap;margin-top:15px}.tag{font-size:10px;padding:6px 9px;border-radius:999px;background:#8d79ff16;border:1px solid #a28dff35;color:#cfc4ff}
+.flow{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;align-items:stretch}
+.flow-step{padding:17px 12px;text-align:center;border:1px solid #9887e644;background:#171633;border-radius:15px;position:relative}
+.flow-step b{display:block;font-size:12px;margin-bottom:7px}.flow-step small{display:block;color:#aaa3c8;font-size:10px;line-height:1.6}
+.flow-step:not(:last-child):after{content:"›";position:absolute;right:-11px;top:35%;font-size:22px;color:#a996ff;z-index:2}
+.security-band{padding:30px;display:grid;grid-template-columns:1fr 1fr;gap:26px;align-items:center}
+.security-band h3{font-size:28px}.security-band p{font-size:12px;line-height:1.9;color:#bcb5d6}
+.checks{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.check{font-size:11px;color:#ddd6f3;display:flex;gap:9px;align-items:flex-start}.check i{font-style:normal;color:#8de2cb}
+.tech-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.tech{padding:20px;text-align:center}.tech b{display:block;font-size:14px;margin-bottom:7px}.tech span{font-size:10px;color:#aaa3c8;line-height:1.6}
+.download{padding:58px 36px;text-align:center;position:relative;overflow:hidden}
+.download:before{content:"";position:absolute;inset:-50%;background:radial-gradient(ellipse at center,#735dff35,transparent 48%);pointer-events:none}
+.download h3{position:relative}.download p{position:relative;color:#bcb5d6;font-size:13px;line-height:1.8}
+.download .btn{position:relative;margin-top:14px;min-width:210px}
+.download small{display:block;position:relative;margin-top:13px;color:#9289b6;font-size:10px}
+footer{padding:35px 0 45px;border-top:1px solid #a18bff22;color:#8f88ac;font-size:11px}
+.footer-row{display:flex;justify-content:space-between;gap:20px;align-items:center;flex-wrap:wrap}
+.footer-links{display:flex;gap:18px}
+.disclaimer{margin-top:20px;max-width:900px;line-height:1.8;color:#79738f;font-size:10px}
+.reveal{opacity:0;transform:translateY(18px);transition:.65s}.reveal.visible{opacity:1;transform:none}
+@media(max-width:900px){.character-roster{grid-template-columns:repeat(4,1fr)}.hero-grid,.intro-panel{grid-template-columns:1fr}.hero{padding-top:120px}.hero-art{min-height:440px}.nav-links{gap:14px}.agent-grid{grid-template-columns:repeat(2,1fr)}.tech-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:640px){.character-roster{grid-template-columns:repeat(2,1fr)}.character-portrait{height:115px}.container{width:min(100% - 28px,560px)}.nav{height:66px}.nav-links{display:none;position:absolute;top:66px;left:0;right:0;padding:18px 22px;background:#0c0b21;border-bottom:1px solid var(--line);flex-direction:column;align-items:flex-start}.nav-links.open{display:flex}.menu{display:block}.nav-cta{display:none}.hero{min-height:auto;padding:112px 0 55px}.hero-art{min-height:390px}.agent-orb{width:72px;height:72px;font-size:10px}.agent-orb small{font-size:8px}.core{width:115px;height:115px}.core strong{font-size:24px}.orbit{width:330px;height:150px}.orbit.two{width:300px;height:190px}.hero-actions{align-items:stretch}.hero-actions .btn{width:100%;text-align:center}.section{padding:68px 0}section{padding:68px 0}.agent-grid,.engine-grid{grid-template-columns:1fr}.fact-row{grid-template-columns:1fr 1fr 1fr}.flow{grid-template-columns:1fr;gap:8px}.flow-step:not(:last-child):after{content:"↓";right:50%;top:auto;bottom:-18px;transform:translateX(50%)}.security-band{grid-template-columns:1fr;padding:22px}.checks{grid-template-columns:1fr}.tech-grid{grid-template-columns:1fr 1fr}.download{padding:42px 20px}.footer-row{align-items:flex-start;flex-direction:column}}
+
+/* AION visual system v2.10 — warm graphite, champagne gold, restrained contrast */
+:root{--bg:#0d0b09;--bg2:#17120e;--panel:rgba(29,22,16,.92);--line:rgba(230,170,91,.22);--text:#fff7ed;--muted:#b9a58e;--violet:#e7a653;--blue:#e7b76f;--pink:#f0c78e;--gold:#ffd18a;--glow:0 18px 55px rgba(0,0,0,.28);}
+body{background:radial-gradient(ellipse at 70% -10%,rgba(194,119,44,.15),transparent 36%),linear-gradient(180deg,#0d0b09,#17110c 55%,#0d0b09)}
+header{background:rgba(13,11,9,.82);border-bottom-color:rgba(230,170,91,.18)}
+.brand small,.micro,.hero-copy,.intro-copy p,.agent-card p,.engine p,.lead{color:#c1b19d}
+.nav-links{color:#d2c0a8}.nav-links a:hover{color:#ffd18a}
+.nav-cta,.btn{border:1px solid rgba(255,209,138,.32);background:linear-gradient(110deg,#f7d49b,#d99442);color:#26180a;box-shadow:0 8px 24px rgba(191,119,43,.16)}
+.nav-cta:hover,.btn:hover{box-shadow:0 12px 30px rgba(191,119,43,.26)}
+.eyebrow,.kicker{color:#e6b36f}.dot{background:#e6b36f;box-shadow:0 0 12px #e6b36f}
+h1{text-shadow:0 0 35px rgba(211,145,69,.2)}
+.hero h1 span{background:linear-gradient(100deg,#fff8ed 10%,#f2c27e 52%,#d98d43 95%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero-art{border-color:rgba(230,170,91,.24);background:linear-gradient(140deg,rgba(64,39,19,.46),rgba(15,12,9,.78)),radial-gradient(ellipse at 50% 50%,rgba(197,124,49,.24),transparent 58%);box-shadow:0 25px 90px #0009,inset 0 0 70px rgba(218,151,72,.08)}
+.hero-art:before{border-color:rgba(236,185,111,.2)}.hero-art:after{border-color:rgba(238,184,105,.2);box-shadow:0 0 60px rgba(190,122,47,.15),inset 0 0 60px rgba(190,122,47,.12)}
+.orbit{border-color:rgba(231,178,105,.34)}.orbit.two{border-color:rgba(255,216,159,.24)}
+.core{background:radial-gradient(circle,#9b6128,#42280f 65%,#1b1109);border-color:#e8bd7c;box-shadow:0 0 28px rgba(220,155,79,.4),0 0 90px rgba(171,105,38,.26)}
+.core small{color:#f5dcb7}.agent-orb{background:linear-gradient(145deg,#493019,#1d140c);border-color:rgba(239,192,126,.58);box-shadow:0 0 25px rgba(180,113,48,.2)}.agent-orb small{color:#c8b092}
+.art-note{color:#c0a783}.art-spark{color:#f3d3a3;text-shadow:0 0 15px rgba(235,178,105,.5)}
+.glass{background:linear-gradient(145deg,rgba(49,34,20,.82),rgba(19,15,11,.9));border-color:rgba(230,170,91,.2);box-shadow:0 16px 42px rgba(0,0,0,.18)}
+.fact,.character,.agent-card,.engine,.arch-node,.flow-step,.tech,.download{border-color:rgba(230,170,91,.2)}
+.fact b{color:#f3c987}.arch-node{background:rgba(48,31,17,.8);color:#fff2df}.arch-node small{color:#c1a987}
+.agent-avatar{background:linear-gradient(145deg,#805024,#2b1a0d);border-color:rgba(241,195,127,.42)}.agent-card .role{color:#e0b46f}
+.tags .tag{background:rgba(205,136,61,.1);border-color:rgba(230,170,91,.25);color:#e9c58f}
+.btn.secondary{background:rgba(44,31,19,.8);color:#f4e5d0;border-color:rgba(230,170,91,.25)}
+footer{border-top-color:rgba(230,170,91,.2)}
+@media(max-width:640px){.hero-art{min-height:370px}.agent-orb{width:68px;height:68px}.character-portrait{height:108px}}
+</style>
+</head>
+<body>
+<div class="noise"></div>
+<header>
+  <div class="container nav">
+    <a class="brand" href="#home"><img class="brand-mark" src="assets/aion-brand.webp" alt="AION"><span>AION<small>YOUR PERSONAL AI TRADING AGENT</small></span></a>
+    <nav class="nav-links" id="navLinks">
+      <a href="#home">首页</a><a href="#about">项目介绍</a><a href="#agents">六个 AI</a><a href="#engines">核心引擎</a><a href="#factor-lab">因子进化</a><a href="#autopilot">托管模式</a><a href="#architecture">技术架构</a><a href="#download">下载中心</a>
+    </nav>
+    <a class="nav-cta" href="#download">下载 Android <span>↗</span></a>
+    <button class="menu" id="menuBtn" aria-label="打开菜单">☰</button>
+  </div>
+</header>
+
+<main>
+<section class="hero" id="home">
+  <div class="container hero-grid">
+    <div class="reveal">
+      <div class="eyebrow"><span class="dot"></span> MULTI-AGENT RESEARCH · QUANT · RISK · EXECUTION</div>
+      <h1><span>AION</span></h1>
+      <h2>六个 AI 协作，<br>构建可审计的交易链路。</h2>
+      <p class="hero-copy">AION 是多智能体加密货币合约交易与量化研究系统。六个 AI 分工分析，确定性量化引擎负责因子计算与评估，独立风控审核交易意图，执行引擎负责订单与保护单。默认 PAPER 模拟盘；TESTNET 与 MAINNET 必须由你显式配置和授权。</p>
+      <div class="hero-actions">
+        <a class="btn" href="#download">下载 Android，立即开始</a>
+        <a class="btn secondary" href="#download">↓　下载 Android</a>
+      </div>
+      <div class="micro">默认模拟盘 · 逐根 K 线分析 · 日内模式 · 云端 24/7 巡检</div>
+    </div>
+    <div class="hero-art reveal" aria-label="AION AI Agent 协作视觉示意">
+      <div class="orbit"></div><div class="orbit two"></div>
+      <div class="core"><div><strong>AION</strong><small>AI TRADING CORE</small></div></div>
+      <div class="agent-orb a1">Claude<small>AI AGENT</small></div>
+      <div class="agent-orb a2">Kimi<small>AI AGENT</small></div>
+      <div class="agent-orb a3">DeepSeek<small>AI AGENT</small></div>
+      <div class="agent-orb a4">ChatGPT<small>AI AGENT</small></div>
+      <div class="agent-orb a5">Gemini<small>AI AGENT</small></div>
+      <div class="agent-orb a6">Grok<small>AI AGENT</small></div>
+      <div class="agent-orb" style="top:72%;left:4%">MiniMax<small>AI AGENT</small></div>
+      <div class="agent-orb" style="top:72%;right:4%">Qwen<small>AI AGENT</small></div>
+      <span class="art-spark s1">✦</span><span class="art-spark s2">✧</span><span class="art-spark s3">✦</span>
+      <div class="art-note">MULTI-AGENT ORCHESTRATION / CONCEPT VISUAL</div>
+    </div>
+  </div>
+</section>
+
+<section id="about">
+  <div class="container">
+    <div class="section-head reveal"><div class="kicker">01 / ABOUT AION</div><h3>不只是一个 AI 聊天工具。<br>而是一套完整的交易系统。</h3><p class="lead">AION 将 AI 的研究与推理能力、量化引擎的确定性计算、独立风控和交易执行连接起来。Android 客户端负责查看状态与发送控制指令，云端负责持续运行、数据处理与任务编排。</p></div>
+    <div class="intro-panel">
+      <div class="glass intro-copy reveal">
+        <h3 style="font-size:25px;margin-top:0">面向大众，注册即用</h3>
+        <p>AION 采用 App 即全部的使用方式：下载 Android 客户端即可注册、开启托管、查看账户与持仓，无需接触任何服务器配置。每个用户的 API Key、策略、持仓与学习记录彼此隔离。系统围绕 Binance USDⓈ-M Futures 设计，账户、行情、策略、风险、订单与审计信息都在客户端内完成。</p>
+        <p>系统强调可解释、可追溯与安全边界：AI 负责分析并提交结构化交易意图；独立风控引擎负责审核；只有执行引擎可以向交易所提交订单。真实下单后立即挂保护单，云端持续巡检并自动平仓。</p>
+        <div class="fact-row">
+          <div class="fact"><b>6</b><span>协作 AI Agent</span></div>
+          <div class="fact"><b>3</b><span>模拟 / 测试 / 主网</span></div>
+          <div class="fact"><b>24/7</b><span>云端巡检与保护</span></div>
+        </div>
+      </div>
+      <div class="glass arch-mini reveal">
+        <div class="arch-node">Android App <small>Kotlin · Jetpack Compose · 控制台</small></div>
+        <div class="arch-arrow">↓ HTTPS / WSS ↓</div>
+        <div class="arch-node">FastAPI Backend <small>认证 · API · 实时事件 · 任务编排</small></div>
+        <div class="arch-arrow">↓</div>
+        <div class="arch-node">AI / Quant / Strategy / Risk / Execution <small>安全隔离 · 明确权限边界</small></div>
+        <div class="arch-arrow">↓</div>
+        <div class="arch-node">PostgreSQL + Redis + Binance Adapter <small>持久化 · 缓存协调 · 交易所适配</small></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="agents">
+  <div class="container">
+    <div class="section-head reveal"><div class="kicker">02 / SIX AI AGENTS</div><h3>六个 AI 协作，做出一个可审查的决定。</h3><p class="lead">由 Orchestrator 统一调度：前三个 AI 感知市场，策略研究员给出方案，首席决策官拍板，反方风控官拥有一票否决权。Agent 只负责研究与决策；真实下单由独立执行引擎完成，并自动挂上止损与止盈。</p></div>
+    <div class="kicker" style="margin:0 0 12px">AI 模型阵容 · 由这些模型驱动六个 AI 角色</div>
+    <div class="character-roster reveal" aria-label="AION AI 模型阵容">
+      <!-- 将你提供的原始角色立绘放入 assets/characters/，文件名如下；不在网页中添加自创称号。 -->
+      <div class="character"><div class="character-portrait"><img src="assets/characters/claude.png" alt="Claude" onerror="this.remove()">C</div><b>Claude</b><small>AI CHARACTER</small></div>
+      <div class="character"><div class="character-portrait"><img src="assets/characters/kimi.png" alt="Kimi" onerror="this.remove()">K</div><b>Kimi</b><small>AI CHARACTER</small></div>
+      <div class="character"><div class="character-portrait"><img src="assets/characters/deepseek.png" alt="DeepSeek" onerror="this.remove()">D</div><b>DeepSeek</b><small>AI CHARACTER</small></div>
+      <div class="character"><div class="character-portrait"><img src="assets/characters/chatgpt.png" alt="ChatGPT" onerror="this.remove()">G</div><b>ChatGPT</b><small>AI CHARACTER</small></div>
+      <div class="character"><div class="character-portrait"><img src="assets/characters/gemini.png" alt="Gemini" onerror="this.remove()">G</div><b>Gemini</b><small>AI CHARACTER</small></div>
+      <div class="character"><div class="character-portrait"><img src="assets/characters/grok.png" alt="Grok" onerror="this.remove()">X</div><b>Grok</b><small>AI CHARACTER</small></div>
+      <div class="character"><div class="character-portrait"><img src="assets/characters/minimax.png" alt="MiniMax" onerror="this.remove()">M</div><b>MiniMax</b><small>AI CHARACTER</small></div>
+      <div class="character"><div class="character-portrait"><img src="assets/characters/qwen.png" alt="Qwen" onerror="this.remove()">Q</div><b>Qwen</b><small>AI CHARACTER</small></div>
+    </div>
+    <div class="agent-grid">
+      <article class="glass agent-card reveal"><div class="agent-top"><div class="agent-avatar">01</div><div><h4>Market Regime Agent</h4><div class="role">市场状态识别</div></div></div><p>识别趋势、震荡、高波动与低流动性状态，给出证据、置信度和不确定性。</p></article>
+      <article class="glass agent-card reveal"><div class="agent-top"><div class="agent-avatar">02</div><div><h4>Technical Analysis Agent</h4><div class="role">技术结构分析</div></div></div><p>分析多周期结构、指标、关键价位与技术形态，不编造价格或指标。</p></article>
+      <article class="glass agent-card reveal"><div class="agent-top"><div class="agent-avatar">03</div><div><h4>Derivatives Analysis Agent</h4><div class="role">衍生品数据分析</div></div></div><p>分析资金费率、未平仓量、基差等可获取数据，缺失数据会明确标记。</p></article>
+      <article class="glass agent-card reveal"><div class="agent-top"><div class="agent-avatar">04</div><div><h4>Strategy Research Agent</h4><div class="role">策略研究与验证</div></div></div><p>提出策略假设、参数范围、失效条件和验证计划，不直接下单。</p></article>
+      <article class="glass agent-card reveal"><div class="agent-top"><div class="agent-avatar">05</div><div><h4>Chief Trading Decision Agent</h4><div class="role">首席交易决策</div></div></div><p>综合各方分析，输出结构化 TradeIntent 或 NO_TRADE。</p></article>
+      <article class="glass agent-card reveal"><div class="agent-top"><div class="agent-avatar">06</div><div><h4>Adversarial Review Agent</h4><div class="role">对抗审查 · 一票否决</div></div></div><p>寻找反向证据、数据质量问题、过拟合与事件风险；拥有 VETO 权限，可以直接否决本次交易。</p></article>
+    </div>
+    <p class="micro" style="margin-top:16px">六个 AI 是系统内的职责角色，可由不同大模型驱动；立绘为模型品牌展示，不代表某个 Agent 固定绑定某个模型，每个 Agent 都可以使用不同的模型。</p>
+  </div>
+</section>
+
+<section id="engines">
+  <div class="container">
+    <div class="section-head reveal"><div class="kicker">03 / CORE ENGINES</div><h3>从研究，到信号，再到受控执行。</h3><p class="lead">AION 不是让大模型直接控制交易所，而是把概率性分析与确定性交易规则分层处理。</p></div>
+    <div class="engine-grid">
+      <article class="glass engine reveal"><span class="num">01</span><h4>Quant Engine · 量化引擎</h4><p>负责确定性指标计算、多周期聚合、波动率与风险收益比估算，以及回测数据处理。AI 解释数据、提出假设，不替代量化计算。</p><div class="tags"><span class="tag">EMA / SMA</span><span class="tag">RSI / MACD</span><span class="tag">ATR / Bollinger</span><span class="tag">逐根 OHLCV</span></div></article>
+      <article class="glass engine reveal"><span class="num">02</span><h4>Strategy Engine · 策略引擎</h4><p>管理策略假设、版本、参数、适用市场、失效条件和验证结果。策略必须经过对应阶段与明确批准，不能自行越级进入真实交易。</p><div class="tags"><span class="tag">Research</span><span class="tag">Backtest</span><span class="tag">Paper</span><span class="tag">Shadow</span><span class="tag">Approved / Active</span></div></article>
+      <article class="glass engine reveal"><span class="num">03</span><h4>Risk Engine · 独立风控</h4><p>独立检查交易模式、交易对白名单、杠杆、名义价值、亏损预算、总敞口、保证金、行情新鲜度、熔断状态和订单对账情况。</p><div class="tags"><span class="tag">Risk Budget</span><span class="tag">Hard Limits</span><span class="tag">Circuit Breaker</span><span class="tag">Fail Closed</span></div></article>
+      <article class="glass engine reveal"><span class="num">04</span><h4>Execution Engine · 执行引擎</h4><p>唯一可以向交易所提交订单的模块。负责幂等键、订单状态机、超时恢复、部分成交处理、保护单验证与持续对账。</p><div class="tags"><span class="tag">TradeIntent</span><span class="tag">Idempotency</span><span class="tag">Order State Machine</span><span class="tag">Reconciliation</span></div></article>
+    </div>
+  </div>
+</section>
+
+
+<section id="factor-lab">
+  <div class="container">
+    <div class="section-head reveal"><div class="kicker">04 / FACTOR INTELLIGENCE</div><h3>让 AI 提出假设，让量化引擎负责验证。</h3><p class="lead">六个因子研究员围绕不同市场领域提出候选公式，确定性评估器使用历史 K 线计算 IC、ICIR、命中率与覆盖率。通过验证并处于 ACTIVE 的因子，会被实时信号引擎计算，并作为证据送入六 AI 决策上下文。</p></div>
+    <div class="engine-grid">
+      <article class="glass engine reveal"><span class="num">01</span><h4>AI 因子挖掘</h4><p>研究员从 11 种白名单确定性公式中选择结构与参数，不能生成任意可执行代码。候选必须经过量化评估，未通过的不会进入有效因子集合。</p><div class="tags"><span class="tag">11 种公式</span><span class="tag">IC / ICIR</span><span class="tag">样本覆盖率</span></div></article>
+      <article class="glass engine reveal"><span class="num">02</span><h4>市场状态自适应组合</h4><p>根据已收盘 K 线识别趋势、震荡、高波动或未知状态，并对有效因子权重应用透明、有限的状态乘数。组合权重是可解释基线，不代表已训练出最优模型。</p><div class="tags"><span class="tag">TRENDING</span><span class="tag">RANGING</span><span class="tag">HIGH_VOLATILITY</span></div></article>
+      <article class="glass engine reveal"><span class="num">03</span><h4>因子生命周期</h4><p>对 ACTIVE / WATCH 因子重新检查近期样本外表现。信号衰退或方向反转时可降为 WATCH；通过后可重新激活。刷新由 API 显式触发。</p><div class="tags"><span class="tag">ACTIVE</span><span class="tag">WATCH</span><span class="tag">IC 复核</span></div></article>
+      <article class="glass engine reveal"><span class="num">04</span><h4>策略影子进化</h4><p>按市场状态提出策略研究方向，并参考已有 PAPER 交易结果形成复核建议。当前只输出 SHADOW_RESEARCH_ONLY 候选，不会自动改参数、风控限额或下单。</p><div class="tags"><span class="tag">Walk-forward</span><span class="tag">Fees / Slippage</span><span class="tag">No Auto Orders</span></div></article>
+    </div>
+    <p class="micro" style="margin-top:18px">重要边界：因子信号是六 AI 的决策证据之一，不是独立交易指令；策略进化仍处于影子研究阶段。上线前应在 PAPER 与 Binance Testnet 中完成验证。</p>
+  </div>
+</section>
+
+<section id="workflow">
+  <div class="container">
+    <div class="section-head reveal"><div class="kicker">05 / TRADE WORKFLOW</div><h3>每一笔交易，都有清晰的责任链。</h3><p class="lead">交易意图必须经过验证与独立审核。状态未知时采取保守处理，不盲目重试，不用本地假状态代替交易所事实。</p></div>
+    <div class="flow reveal">
+      <div class="flow-step"><b>01 · Market Data</b><small>行情采集与时间戳校验</small></div>
+      <div class="flow-step"><b>02 · 六个 AI 合议</b><small>接力分析并生成 TradeIntent</small></div>
+      <div class="flow-step"><b>03 · Validation</b><small>Schema 与策略版本验证</small></div>
+      <div class="flow-step"><b>04 · Risk Engine</b><small>独立风控审核与批准</small></div>
+      <div class="flow-step"><b>05 · Execution</b><small>执行、保护单与交易所对账</small></div>
+    </div>
+  </div>
+</section>
+
+
+<section id="autopilot">
+  <div class="container">
+    <div class="section-head reveal"><div class="kicker">06 / AUTOPILOT</div><h3>授权之后，AI 全权接管。</h3><p class="lead">开启托管后，AI 不需要你逐笔确认：分析、开仓、止盈止损与平仓由系统自动完成，每一笔仍必须通过独立风控。</p></div>
+    <div class="engine-grid">
+      <article class="glass engine reveal"><span class="num">01</span><h4>自动开仓</h4><p>六个 AI 合议给出方向与结构，风控引擎检查杠杆、名义价值、亏损预算与行情新鲜度后，由执行引擎自动下单。</p><div class="tags"><span class="tag">六 AI 合议</span><span class="tag">独立风控</span><span class="tag">幂等下单</span></div></article>
+      <article class="glass engine reveal"><span class="num">02</span><h4>自动止盈止损</h4><p>成交后立即在交易所挂 STOP_MARKET 与 TAKE_PROFIT_MARKET；云端每 30 秒校验保护单，缺失会自动补挂。</p><div class="tags"><span class="tag">保护单</span><span class="tag">补挂</span><span class="tag">持续对账</span></div></article>
+      <article class="glass engine reveal"><span class="num">03</span><h4>自动平仓</h4><p>触发止盈、止损、日内持仓超时或人工指令时，先撤保护单，再以 reduceOnly 市价平仓，并记录完整订单与成交链路。</p><div class="tags"><span class="tag">TP / SL</span><span class="tag">日内超时</span><span class="tag">reduceOnly</span></div></article>
+      <article class="glass engine reveal"><span class="num">04</span><h4>学习与进化</h4><p>每笔交易结果写入服务器，统计胜率、盈亏与不同市场状态下的表现，提炼成经验并注入后续分析，将复盘信息作为后续研究与分析的参考；策略参数不会因影子研究建议而自动修改。</p><div class="tags"><span class="tag">TradeOutcome</span><span class="tag">经验沉淀</span><span class="tag">置信度校准</span></div></article>
+    </div>
+    <div class="glass security-band reveal" style="margin-top:16px">
+      <div><div class="kicker">EXECUTION MODES</div><h3 style="font-size:24px">三种账户，逐级放开。</h3><p>默认模拟盘，不接触真实资金；测试网使用 Binance 测试资金；主网需要二次验证解锁、TOTP 与你自己的 API Key。密钥全程加密保存。</p></div>
+      <div class="checks">
+        <div class="check"><i>✦</i><span>PAPER · 内部撮合，注册即可体验</span></div>
+        <div class="check"><i>✦</i><span>TESTNET · 测试网 Key，验证真实链路</span></div>
+        <div class="check"><i>✦</i><span>MAINNET · 二次验证 + TOTP 后才能开启</span></div>
+        <div class="check"><i>✦</i><span>日内模式 · 超过持仓上限自动平仓</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="architecture">
+  <div class="container">
+    <div class="section-head reveal"><div class="kicker">07 / SYSTEM CAPABILITIES</div><h3>手机负责控制，AION 负责运行。</h3><p class="lead">分析、风控与执行都在安全环境中完成，Android 客户端只负责查看状态与发送指令。所有交易与托管状态实时同步，密钥不进入手机。</p></div>
+    <div class="tech-grid reveal">
+      <div class="glass tech"><b>六个 AI</b><span>多模型协作<br>职责分工 · 一票否决</span></div>
+      <div class="glass tech"><b>量化分析</b><span>逐根 K 线<br>EMA · RSI · ATR</span></div>
+      <div class="glass tech"><b>独立风控</b><span>杠杆 · 名义价值<br>回撤 · 亏损预算</span></div>
+      <div class="glass tech"><b>自动执行</b><span>开仓 · 止盈止损<br>平仓 · 撤单</span></div>
+      <div class="glass tech"><b>日内模式</b><span>持仓超时<br>自动平仓</span></div>
+      <div class="glass tech"><b>数据安全</b><span>密钥加密<br>账户隔离</span></div>
+      <div class="glass tech"><b>实时同步</b><span>账户 · 持仓<br>订单 · 通知</span></div>
+      <div class="glass tech"><b>审计追踪</b><span>操作记录<br>交易复盘</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="security">
+  <div class="container">
+    <div class="glass security-band reveal">
+      <div><div class="kicker">08 / SAFETY BY DESIGN</div><h3>自主运行，不等于没有边界。</h3><p>自动托管仅在你明确授权的交易模式、策略与风险范围内运行；并不代表无限杠杆、无限仓位或无限亏损。安全规则是系统架构的一部分，而不是可选装饰。</p></div>
+      <div class="checks">
+        <div class="check"><i>✦</i><span>默认 PAPER，主网需二次验证 + TOTP</span></div>
+        <div class="check"><i>✦</i><span>AI 不持有 API Secret，只能提交交易意图</span></div>
+        <div class="check"><i>✦</i><span>提现、内部转账与资金划转权限禁用</span></div>
+        <div class="check"><i>✦</i><span>Testnet 与 Mainnet 配置严格隔离</span></div>
+        <div class="check"><i>✦</i><span>风控不可用或状态未知时拒绝新增风险</span></div>
+        <div class="check"><i>✦</i><span>订单幂等、超时先查询、持续对账</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="download">
+  <div class="container">
+    <div class="glass download reveal">
+      <div class="kicker">09 / DOWNLOAD CENTER</div>
+      <h3>现在就可以开始。</h3>
+      <p>下载 Android 客户端即可注册，注册后默认使用模拟盘，随时查看托管状态、持仓与每一笔交易记录。</p>
+      <a class="btn" href="/downloads/aion-debug.apk" download>↓　Android APK 下载</a>
+      <small id="downloadStatus">AION Android 调试版 · 直连官方服务器下载</small>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="container">
+    <div class="footer-row">
+      <a class="brand" href="#home"><img class="brand-mark" src="assets/aion-brand.webp" alt="AION"><span>AION<small>YOUR PERSONAL AI TRADING AGENT</small></span></a>
+      <div class="footer-links"><a href="#about">项目介绍</a><a href="#architecture">技术架构</a><a href="#download">下载中心</a></div>
+      <span>© AION 2026</span>
+    </div>
+    <p class="disclaimer">风险提示：本页面不构成投资建议，不承诺收益。合约交易具有高风险，可能导致本金全部损失。系统默认使用模拟盘；测试网与主网需要你自行提供 Binance API Key 并显式授权，主网还需二次验证与 TOTP。历史表现与 AI 分析不代表未来收益。</p>
+  </div>
+</footer>
+
+<script>
+const menuBtn=document.getElementById('menuBtn');
+const navLinks=document.getElementById('navLinks');
+menuBtn.addEventListener('click',()=>navLinks.classList.toggle('open'));
+navLinks.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>navLinks.classList.remove('open')));
+const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add('visible');observer.unobserve(entry.target)}}),{threshold:.12});
+document.querySelectorAll('.reveal').forEach(el=>observer.observe(el));
+fetch('/downloads/aion-debug.apk',{method:'HEAD'}).then(r=>{
+  const n=Number(r.headers.get('content-length')||0);
+  if(r.ok&&n>0)document.getElementById('downloadStatus').textContent='AION Android 调试版 · '+(n/1048576).toFixed(1)+' MB · 直连官方服务器下载';
+}).catch(()=>{});
+</script>
+</body>
+</html>

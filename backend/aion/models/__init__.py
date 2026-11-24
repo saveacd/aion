@@ -1,0 +1,103 @@
+"""All ORM models. Importing this package registers every table with Base.metadata."""
+
+from aion.models.account import (
+    AccountSnapshot,
+    AuditLog,
+    IdempotencyKey,
+    Notification,
+    PositionSnapshot,
+    ReconciliationRun,
+    RiskEvent,
+    SystemEvent,
+    TradingControlState,
+)
+from aion.models.agent import AgentMessage, AgentRun, ModelCall
+from aion.models.auth import (
+    DeviceSession,
+    ExchangeAccount,
+    ModelProvider,
+    SystemSetting,
+    User,
+    UserModelSetting,
+)
+from aion.models.autopilot import (
+    AutopilotConfig,
+    LearningLesson,
+    LivePosition,
+    PaperPosition,
+    TradeOutcome,
+)
+from aion.models.research import (FactorResearchTask, FactorValidationResult, FactorVersion, FactorLifecycleEvent, ResearchTaskLog, FactorEnsembleVersion, StrategyCandidate, PaperStrategySession, PaperTradeRecord, StrategyApproval, StrategyBacktest)
+from aion.models.base import Base
+from aion.models.factors import FactorRecord
+from aion.models.market import (
+    DerivativesSnapshot,
+    MarketCandle,
+    MarketSnapshot,
+    MarketSymbol,
+)
+from aion.models.trading import (
+    STRATEGY_STATES,
+    BacktestRun,
+    Fill,
+    Order,
+    OrderEvent,
+    RiskDecision,
+    RiskPolicy,
+    Strategy,
+    StrategyVersion,
+    TradeIntent,
+)
+
+__all__ = [
+    "STRATEGY_STATES",
+    "AccountSnapshot",
+    "AgentMessage",
+    "AgentRun",
+    "AuditLog",
+    "AutopilotConfig",
+    "BacktestRun",
+    "Base",
+    "DerivativesSnapshot",
+    "DeviceSession",
+    "ExchangeAccount",
+    "FactorRecord",
+    "FactorResearchTask",
+    "FactorValidationResult",
+    "FactorVersion",
+    "FactorLifecycleEvent",
+    "ResearchTaskLog",
+    "FactorEnsembleVersion",
+    "StrategyCandidate",
+    "PaperStrategySession",
+    "PaperTradeRecord",
+    "StrategyApproval",
+    "StrategyBacktest",
+    "Fill",
+    "IdempotencyKey",
+    "LearningLesson",
+    "LivePosition",
+    "MarketCandle",
+    "MarketSnapshot",
+    "MarketSymbol",
+    "ModelCall",
+    "ModelProvider",
+    "Notification",
+    "Order",
+    "OrderEvent",
+    "PaperPosition",
+    "PositionSnapshot",
+    "ReconciliationRun",
+    "RiskDecision",
+    "RiskEvent",
+    "RiskPolicy",
+    "Strategy",
+    "StrategyVersion",
+    "SystemEvent",
+    "SystemSetting",
+    "TradeIntent",
+    "TradeOutcome",
+    "TradingControlState",
+    "User",
+    "UserModelSetting",
+]

@@ -1,0 +1,33 @@
+# 环境与密钥
+.env
+backend/.env
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+# 前端 / 移动端构建产物
+node_modules/
+android/build/
+android/app/build/
+android/.gradle/
+android/.kotlin/
+android/local.properties
+*.apk
+
+# 运行时产物
+dist/
+logs/
+*.log
+
+# 编辑器
+.idea/
+.vscode/
+.DS_Store
