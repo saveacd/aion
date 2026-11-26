@@ -77,7 +77,30 @@ class Orchestrator:
         self.timeout_seconds = float(getattr(settings, "agent_run_timeout_seconds", 180))
         self.min_trade_confidence = min(1.0, max(0.0, float(min_trade_confidence)))
 
-    async def analyze(self, ctx: AgentContext) -> OrchestratorResult:
+    async def research_market(self, ctx: AgentContext) -> dict[str, Any] | None:
+        started = time.perf_counter()
+        outputs: dict[str, AgentOutput] = {}
+        sem = asyncio.Semaphore(self.max_concurrency)
+        reasons = await self._run_stage(FIRST_STAGE, ctx, sem, outputs)
+        if not reasons:
+            reasons = await self._run_stage(
+                ("strategy_research",), ctx.with_upstream(_dump(outputs)), sem, outputs
+            )
+        input_tokens, output_tokens = _usage(self.gateway, ctx.run_id)
+        provider, model = _route_info(self.gateway)
+        await self.recorder.finish_run(
+            run_id=ctx.run_id, verdict="RESEARCH", confidence=None,
+            summary="共享市场研究未完成" if reasons else "共享市场研究完成",
+            duration_ms=int((time.perf_counter() - started) * 1000),
+            provider=provider, model=model, input_tokens=input_tokens, output_tokens=output_tokens,
+            cost_usd=await self._run_cost(ctx.run_id),
+            error="; ".join(reasons) if reasons else None,
+        )
+        return None if reasons else _dump(outputs)
+
+    async def analyze(
+        self, ctx: AgentContext, *, shared_research: dict[str, Any] | None = None
+    ) -> OrchestratorResult:
         started = time.perf_counter()
         outputs: dict[str, AgentOutput] = {}
         await self.recorder.ensure_run(
@@ -85,14 +108,25 @@ class Orchestrator:
         )
         sem = asyncio.Semaphore(self.max_concurrency)
 
-        reasons = await self._run_stage(FIRST_STAGE, ctx, sem, outputs)
-        if reasons:
-            return await self._finalize(
-                ctx, outputs, Decision.NO_TRADE.value, True, reasons, started
+        if shared_research is None:
+            reasons = await self._run_stage(FIRST_STAGE, ctx, sem, outputs)
+            if reasons:
+                return await self._finalize(
+                    ctx, outputs, Decision.NO_TRADE.value, True, reasons, started
+                )
+
+            reasons = await self._run_stage(
+                ("strategy_research",), ctx.with_upstream(_dump(outputs)), sem, outputs
             )
+            if reasons:
+                return await self._finalize(
+                    ctx, outputs, Decision.NO_TRADE.value, True, reasons, started
+                )
+
+        upstream = dict(shared_research) if shared_research is not None else _dump(outputs)
 
         reasons = await self._run_stage(
-            ("strategy_research",), ctx.with_upstream(_dump(outputs)), sem, outputs
+            ("chief_decision",), ctx.with_upstream(upstream), sem, outputs
         )
         if reasons:
             return await self._finalize(
@@ -100,15 +134,7 @@ class Orchestrator:
             )
 
         reasons = await self._run_stage(
-            ("chief_decision",), ctx.with_upstream(_dump(outputs)), sem, outputs
-        )
-        if reasons:
-            return await self._finalize(
-                ctx, outputs, Decision.NO_TRADE.value, True, reasons, started
-            )
-
-        reasons = await self._run_stage(
-            ("adversarial_review",), ctx.with_upstream(_dump(outputs)), sem, outputs
+            ("adversarial_review",), ctx.with_upstream({**upstream, **_dump(outputs)}), sem, outputs
         )
         if reasons:
             return await self._finalize(
@@ -129,6 +155,14 @@ class Orchestrator:
                 started,
                 confidence=chief.confidence,
                 adversarial_verdict=verdict,
+            )
+
+        if ctx.inputs.get("managed_positions"):
+            action = chief.position_action if chief.decision is Decision.NO_TRADE else None
+            reason = f"{action}: {chief.reason or chief.summary}" if action else "missing_position_action"
+            return await self._finalize(
+                ctx, outputs, Decision.NO_TRADE.value, action is None, [reason], started,
+                confidence=chief.confidence, adversarial_verdict=verdict,
             )
 
         if chief.decision is Decision.NO_TRADE:

@@ -9,7 +9,6 @@ key, and MAINNET additionally requires the server-wide unlock plus user TOTP.
 from __future__ import annotations
 
 import datetime as dt
-import logging
 import uuid
 from decimal import Decimal
 from typing import Literal
@@ -33,8 +32,6 @@ from aion.models import (
 from aion.models.base import utcnow
 from aion.schemas.common import AionModel, Money
 from aion.services.live_trading import close_live_position, resolve_live_client
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/autopilot", tags=["autopilot"])
 
@@ -70,6 +67,7 @@ class AutopilotConfigOut(AionModel):
     interval: str
     intraday: bool
     max_holding_minutes: int
+    live_authorized_at: dt.datetime | None = None
     cycle_seconds: int
     max_trades_per_day: int
     min_confidence: Money
@@ -95,7 +93,7 @@ class AutopilotUpdate(AionModel):
     cycle_seconds: int | None = Field(
         default=None, ge=MIN_CYCLE_SECONDS, le=MAX_CYCLE_SECONDS
     )
-    max_trades_per_day: int | None = Field(default=None, ge=1, le=50)
+    max_trades_per_day: int | None = Field(default=None, ge=0, le=50)
     min_confidence: Decimal | None = Field(default=None, ge=Decimal("0"), le=Decimal("1"))
     strategy_id: uuid.UUID | None = None
 
@@ -158,6 +156,7 @@ def _out(db_cfg: AutopilotConfig) -> AutopilotConfigOut:
         interval=db_cfg.interval,
         intraday=db_cfg.intraday,
         max_holding_minutes=db_cfg.max_holding_minutes,
+        live_authorized_at=db_cfg.live_authorized_at,
         cycle_seconds=db_cfg.cycle_seconds,
         max_trades_per_day=db_cfg.max_trades_per_day,
         min_confidence=db_cfg.min_confidence,
@@ -195,75 +194,36 @@ async def update_config(
         "enabled": cfg.enabled,
         "auto_execute": cfg.auto_execute,
         "execution_mode": cfg.execution_mode,
+        "live_authorized": cfg.live_authorized_at is not None,
     }
     target_mode = payload.execution_mode or cfg.execution_mode or "PAPER"
-    target_auto = payload.auto_execute if payload.auto_execute is not None else cfg.auto_execute
+    target_enabled = payload.enabled if payload.enabled is not None else cfg.enabled
+    target_auto = target_enabled and (
+        payload.auto_execute if payload.auto_execute is not None else cfg.auto_execute
+    )
+    mode_changed = target_mode != cfg.execution_mode
+    needs_live_authorization = (
+        target_mode != "PAPER" and target_auto
+        and (mode_changed or not cfg.auto_execute or cfg.live_authorized_at is None)
+    )
+    if target_auto and (not cfg.auto_execute or needs_live_authorization) and not payload.confirm_auto_execute:
+        raise AppError(ErrorCode.VALIDATION_ERROR, "开启或切换自动执行必须明确确认。")
 
-    if target_mode != "PAPER":
-        if target_mode == "MAINNET":
-            if not settings.mainnet_enabled:
-                raise AppError(
-                    ErrorCode.CONFLICT,
-                    "主网交易未在服务器解锁（AION_MAINNET_ENABLED=false），暂时只能使用测试网或模拟盘。",
-                )
-            # enforce_totp: honour the config flag and VERIFY a fresh code —
-            # "TOTP enabled" alone is not second-factor proof (audit #8).
-            if settings.require_totp_for_mainnet:
-                if not user.totp_enabled:
-                    raise AppError(
-                        ErrorCode.CONFLICT,
-                        "主网自动交易要求先启用两步验证（TOTP）。",
-                    )
-                if not payload.totp_code:
-                    raise AppError(
-                        ErrorCode.VALIDATION_ERROR,
-                        "启用主网自动交易必须输入当前两步验证码（totp_code）。",
-                    )
-                secret = (
-                    SecretBox(settings).try_decrypt(user.totp_secret_enc)
-                    if user.totp_secret_enc
-                    else ""
-                )
-                if not secret or not verify_totp(secret, payload.totp_code):
-                    raise AppError(
-                        ErrorCode.CONFLICT,
-                        "两步验证码不正确或已过期，主网自动交易未启用。",
-                    )
-                # Arm mainnet execution for 24h. execute_live_entry refuses to
-                # fire without this marker, so a stolen session alone cannot
-                # move mainnet funds.
-                try:
-                    from aion.core.redis import get_redis
-
-                    await get_redis().set(
-                        f"aion:mainnet:armed:{user.id}", "1", ex=24 * 3600
-                    )
-                except Exception:  # noqa: BLE001
-                    logger.warning("无法写入主网武装标记（Redis 不可用），主网执行将被拒绝。")
-        client = await resolve_live_client(db, settings, user.id, target_mode)
+    if target_mode != "PAPER" and (mode_changed or needs_live_authorization or payload.enabled is True):
+        if target_mode == "MAINNET" and not settings.mainnet_enabled:
+            raise AppError(ErrorCode.CONFLICT, "主网交易未在服务器解锁。")
+        client = await resolve_live_client(db, settings, user.id, target_mode, allow_operator_fallback=False)
         if client is None:
-            raise AppError(
-                ErrorCode.CONFLICT,
-                f"未找到可用的 Binance {target_mode} API Key，请先在「设置 → 交易所」中保存。",
-            )
+            raise AppError(ErrorCode.CONFLICT, f"未找到可用的 Binance {target_mode} API Key。")
         await client.aclose()
 
-    if target_auto and not cfg.auto_execute and not payload.confirm_auto_execute:
-        raise AppError(
-            ErrorCode.VALIDATION_ERROR,
-            "开启自动开仓必须同时设置 confirm_auto_execute=true，表示你已理解风险。",
+    if needs_live_authorization and target_mode == "MAINNET" and settings.require_totp_for_mainnet:
+        secret = (
+            SecretBox(settings).try_decrypt(user.totp_secret_enc)
+            if user.totp_enabled and user.totp_secret_enc else ""
         )
-    if (
-        payload.execution_mode is not None
-        and target_mode != "PAPER"
-        and payload.execution_mode != cfg.execution_mode
-        and target_auto
-        and not payload.confirm_auto_execute
-    ):
-        raise AppError(
-            ErrorCode.VALIDATION_ERROR,
-            "切换真实账户自动执行必须再次确认（confirm_auto_execute=true）。",
-        )
+        if not secret or not payload.totp_code or not verify_totp(secret, payload.totp_code):
+            raise AppError(ErrorCode.CONFLICT, "首次授权主网持续托管需要有效的两步验证码。")
 
     if payload.strategy_id is not None:
         strategy = await db.get(Strategy, payload.strategy_id)
@@ -276,10 +236,14 @@ async def update_config(
         cfg.enabled = payload.enabled
     if payload.execution_mode is not None:
         cfg.execution_mode = target_mode
-    if payload.auto_execute is not None:
-        cfg.auto_execute = payload.auto_execute
-    if not cfg.enabled:
-        cfg.auto_execute = False
+    cfg.auto_execute = target_auto
+    if not target_auto or target_mode == "PAPER":
+        cfg.live_authorized_at = None
+    elif needs_live_authorization:
+        cfg.live_authorized_at = utcnow()
+    if mode_changed:
+        cfg.watch_plans = []
+        cfg.last_run_at = None
     if payload.symbols is not None:
         cfg.symbols = [s.strip().upper() for s in payload.symbols if s.strip()][:MAX_SYMBOLS]
     if payload.interval is not None:
@@ -307,6 +271,7 @@ async def update_config(
             "enabled": cfg.enabled,
             "auto_execute": cfg.auto_execute,
             "execution_mode": cfg.execution_mode,
+            "live_authorized": cfg.live_authorized_at is not None,
         },
         request=request,
     )

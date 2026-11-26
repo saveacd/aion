@@ -498,7 +498,7 @@ async function loadHome() {
       <div class="hero">
         <div class="tag">SIX AGENTS · ONE DECISION</div>
         <h2>六个 AI，正在${enabled ? "为你盯盘" : "等待你的授权"}。</h2>
-        <p>市场状态、技术面、资金面、策略、决策、反方风控——六个 AI 接力判断；通过风控后，可由 AI 自动开仓、挂止盈止损并平仓。</p>
+        <p>全局市场研究每十分钟更新。个人决策结合账户仓位和风险预算，PAPER 开仓需通过独立风控。</p>
         <div class="chips" style="margin-top:14px;margin-bottom:0">
           <span class="chip ${enabled ? "ok" : ""}">托管 <b>${statusText}</b></span>
           <span class="chip">账户 <b>${esc(mode)}</b></span>
@@ -617,24 +617,36 @@ async function loadAgents() {
   if (!el.dataset.ready) {
     el.innerHTML = `
       <div class="card">
-        <h2>六个 AI 如何协作</h2>
-        <div class="pipeline" id="ag-pipeline"></div>
-        <div class="li-sub" style="margin-top:8px">前三个 AI 负责感知市场，策略研究员给出方案，首席决策官拍板，反方风控官拥有一票否决权。全部结论会写入学习闭环。</div>
+        <h2>全局市场研究</h2>
+        <div id="ag-market"><div class="mutedbox">加载中…</div></div>
       </div>
       <div class="card">
-        <h2>发起一次合议</h2>
+        <h2>个人决策流程</h2>
+        <div class="pipeline" id="ag-pipeline"></div>
+        <div class="li-sub" style="margin-top:8px">行情、技术、衍生品和策略假设由全局研究每十分钟更新。首席决策与对抗审查按账户运行。</div>
+      </div>
+      <div class="card">
+        <h2>发起个人决策</h2>
         <div class="grid2">
           <div class="field"><label>交易对</label><input id="ag-symbol" value="BTCUSDT"></div>
           <div class="field"><label>周期</label><select id="ag-interval">
             <option>15m</option><option>1h</option><option>4h</option><option>1d</option></select></div>
         </div>
-        <button class="btn" id="ag-btn" onclick="startAnalysis('ag')">让六个 AI 开始分析</button>
+        <button class="btn" id="ag-btn" onclick="startAnalysis('ag')">生成个人决策</button>
         <div class="li-sub" style="margin-top:8px">通常 30–180 秒。只产出决策建议，不会直接下单；下单由「AI 全权托管」按你的授权执行。</div>
       </div>
-      <div class="card"><h2>本次合议详情</h2><div id="ag-current"><div class="mutedbox">选择一次运行查看六个 AI 的完整输出</div></div></div>
+      <div class="card"><h2>本次合议详情</h2><div id="ag-current"><div class="mutedbox">选择一次运行查看个人决策记录</div></div></div>
       <div class="card"><h2>历史合议</h2><div id="ag-runs"><div class="mutedbox">加载中…</div></div></div>`;
     el.dataset.ready = "1";
   }
+  const market = await api("/market/research").catch(() => null);
+  $("ag-market").innerHTML = market?.items?.length ? market.items.map(item => {
+    const reports = Object.entries(item.conclusions || {});
+    const roles = Object.fromEntries(roster.map(role => [role.name, role.title]));
+    const quote = item.market?.last_price;
+    return `<div class="msg"><div class="who">${esc(item.symbol)} · ${item.as_of ? esc(ago(item.as_of)) : "等待有效快照"}${quote ? ` · ${esc(quote)}` : ""}</div>
+      ${reports.map(([role, report]) => `<div class="txt"><b>${esc(roles[role] || role)}</b> ${esc(report.summary)}</div>`).join("")}</div>`;
+  }).join("") : '<div class="mutedbox">暂时无法读取共享市场研究</div>';
   try {
     const runs = await api("/agents/runs?limit=10");
     const items = runs.items || [];
@@ -665,7 +677,7 @@ function renderPipeline(roster, detail) {
   const byName = Object.fromEntries(msgs.map(m => [m.agent_name, m]));
   box.innerHTML = roster.map((a, i) => {
     const m = byName[a.name];
-    const status = m?.status || (detail ? "WAIT" : "待命");
+    const status = m?.status || (i < 4 ? "共享" : detail ? "WAIT" : "待命");
     const done = m && m.status === "OK";
     const veto = a.veto && m && (m.status !== "OK" || (m.warnings || []).length);
     const conf = m?.confidence !== null && m?.confidence !== undefined ? Math.round(Number(m.confidence) * 100) + "%" : "";
@@ -717,10 +729,10 @@ async function startAnalysis(prefix) {
   try {
     const r = await api("/agents/analyze", { method: "POST", body: JSON.stringify({ symbol, interval }) });
     S.ai.runId = r.run_id;
-    toast("六个 AI 已开始合议");
+    toast("正在生成个人决策");
     if (S.tab === "agents") loadAgents(); else pollRun(r.run_id);
   } catch (e) { toast(e.message); }
-  finally { btn.disabled = false; btn.textContent = "让六个 AI 开始分析"; }
+  finally { btn.disabled = false; btn.textContent = "生成个人决策"; }
 }
 async function pollRun(id) {
   clearInterval(S.ai.timer);
@@ -1054,7 +1066,7 @@ async function loadAutopilot() {
     S.apMode = c.execution_mode || "PAPER";
     if (!el.dataset.ready) {
       el.innerHTML = `
-        <div class="notice">AI 全权托管：六个 AI 每次合议后，若结论为交易且通过风控，将自动开仓；成交后立即在交易所挂止损/止盈，服务端持续盯盘并自动平仓。模拟盘不使用真实资金；测试网/主网使用你自己的 Binance API Key。</div>
+        <div class="notice">AI 托管使用共享研究和个人账户数据。实盘授权持续有效，直到你关闭或切换账户。开仓由独立风控审核。</div>
         <div class="card"><h2>执行账户</h2>
           <div class="mode-grid" id="ap-modes">
             <div class="mode-card" data-mode="PAPER" onclick="pickMode('PAPER')"><b>模拟盘</b><span>内部撮合<br>不碰真实资金</span></div>
@@ -1073,7 +1085,8 @@ async function loadAutopilot() {
               <select id="ap-intraday"><option value="1">日内（当天平仓）</option><option value="0">允许隔夜</option></select></div>
             <div class="field"><label>最长持仓（分钟）</label><input id="ap-hold" type="number" min="15" max="1440" step="15"></div>
             <div class="field"><label>分析间隔（秒）</label><input id="ap-cycle" type="number" min="60" max="86400" step="60"></div>
-            <div class="field"><label>每日最大交易数</label><input id="ap-maxtrades" type="number" min="1" max="50"></div>
+            <div class="field"><label>首次主网授权验证码</label><input id="ap-totp" type="password" inputmode="numeric" maxlength="8" autocomplete="one-time-code"></div>
+            <div class="field"><label>每日最大交易数（0 不限）</label><input id="ap-maxtrades" type="number" min="0" max="50"></div>
             <div class="field"><label>最小置信度</label><input id="ap-minconf" type="number" min="0" max="1" step="0.05"></div>
             <div class="field"><label>跟随策略</label>
               <select id="ap-strategy"><option value="">AI 自由抉择</option>
@@ -1103,7 +1116,7 @@ async function loadAutopilot() {
       <div class="row"><span class="label">托管状态</span><span class="val ${c.enabled ? "up" : "muted"}">${c.enabled ? (c.auto_execute ? "全权托管中" : "仅分析") : "已关闭"}</span></div>
       <div class="row"><span class="label">执行账户</span><span class="val">${esc(c.execution_mode)}</span></div>
       <div class="row"><span class="label">上次运行</span><span class="val">${c.last_run_at ? ago(c.last_run_at) : "从未运行"}</span></div>
-      <div class="row"><span class="label">今日已开仓</span><span class="val">${c.trades_today} / ${c.max_trades_per_day}</span></div>
+      <div class="row"><span class="label">今日已开仓</span><span class="val">${c.trades_today} · ${c.max_trades_per_day === 0 ? "不限次数" : "上限 " + c.max_trades_per_day}</span></div>
       <div class="row"><span class="label">今日已实现盈亏</span><span class="val ${cls(st.today_realized_pnl_usd)}">${money(st.today_realized_pnl_usd)}</span></div>
       <div class="row"><span class="label">累计已平仓</span><span class="val">${st.total_trades}</span></div>
       ${c.last_error ? `<div class="row"><span class="label">最近错误</span><span class="val warn">${esc(c.last_error)}</span></div>` : ""}`;
@@ -1164,12 +1177,14 @@ ${mode === "MAINNET" ? "⚠ 这是真实资金账户，亏损由你承担。" : 
     intraday: $("ap-intraday").value === "1",
     max_holding_minutes: Number($("ap-hold").value || 240),
     cycle_seconds: Number($("ap-cycle").value || 600),
-    max_trades_per_day: Number($("ap-maxtrades").value || 3),
+    max_trades_per_day: Number($("ap-maxtrades").value || 0),
+    totp_code: mode === "MAINNET" ? $("ap-totp").value.trim() || undefined : undefined,
     min_confidence: Number($("ap-minconf").value || 0.65),
     strategy_id: $("ap-strategy").value || null,
   };
   try {
     await api("/autopilot", { method: "PUT", body: JSON.stringify(body) });
+    $("ap-totp").value = "";
     toast("托管设置已保存"); loadAutopilot();
   } catch (e) { toast(e.message); }
 }
@@ -1251,7 +1266,7 @@ async function loadResearchLab() {
       <div class="field"><label>周期</label><select id="rl-interval"><option>15m</option><option>5m</option><option>1h</option><option>4h</option><option>1d</option></select></div>
       <div class="field"><label>预测周期（K线根数）</label><input id="rl-horizon" type="number" min="1" max="100" value="8"></div>
     </div><button class="btn primary" onclick="enqueueResearchTask()">加入后台研究队列</button></div>
-    <div class="grid2"><div class="card"><h3>研究任务</h3><div id="rl-tasks" class="stack">加载中…</div></div>
+    <div class="grid2"><div class="card"><h3>研究任务</h3><div id="rl-tasks" class="stack">加载中…</div><div id="rl-experiment" class="stack" aria-live="polite"></div></div>
     <div class="card"><h3>策略候选</h3><div id="rl-candidates" class="stack">加载中…</div></div></div>
     <div class="card"><h3>策略横向比较</h3><div id="rl-compare" class="stack">加载中…</div></div>
     <div class="card"><h3>PAPER 并行观察账户</h3><div id="rl-paper" class="stack">加载中…</div></div>
@@ -1266,7 +1281,19 @@ async function loadResearchLab() {
       try { return await api(`/research-lab/paper/sessions/${session.id}/trades`); }
       catch (_) { return []; }
     }))).flat();
-    $("rl-tasks").innerHTML = tasks.length ? tasks.map(t => `<div class="list-row"><b>${esc(t.symbol)} · ${esc(t.interval)}</b><span class="status ${esc(t.status)}">${esc(t.status)}</span><small>${dt(t.created_at)} · 尝试 ${t.attempts}</small>${t.error ? `<small class="down">${esc(t.error)}</small>` : ""}</div>`).join("") : "暂无任务";
+    $("rl-tasks").innerHTML = tasks.length ? tasks.map(t => {
+      const research = t.result?.discovery;
+      return `<div class="list-row"><b>${esc(t.symbol)} · ${esc(t.interval)}</b>
+        <span class="status ${esc(t.status)}">${esc(t.status)}</span>
+        <small>${dt(t.created_at)} · 尝试 ${t.attempts}</small>
+        ${t.error ? `<small class="down">${esc(t.error)}</small>` : ""}
+        ${research ? `<small>${esc(research.status)} · 候选 ${research.candidate_count} · 观察 ${research.watch_count}</small>
+          <button class="btn" data-task="${esc(t.id)}">查看独立验证</button>` : ""}
+      </div>`;
+    }).join("") : "暂无任务";
+    $("rl-tasks").querySelectorAll("[data-task]").forEach(button => {
+      button.addEventListener("click", () => loadFactorExperiment(button.dataset.task));
+    });
     $("rl-candidates").innerHTML = candidates.length ? candidates.map(c => { const spec = c.specification || {}; const ev = c.evaluation || {}; return `<div class="list-row"><b>${esc(c.name)}</b><span class="status">${esc(c.status)}</span><small>${esc(spec.strategy_kind || "research candidate")} · ${esc(ev.gate || "RESEARCH_ONLY")} · ${dt(c.created_at)}</small></div>`; }).join("") : "暂无候选策略";
     $("rl-compare").innerHTML = comparison.length ? comparison.map(x => { const o = x.out_of_sample || {}; const p = x.paper || {}; const pm = p.metrics || {}; return `<div class="list-row"><b>${esc(x.name)} · ${esc(x.strategy_kind)}</b><span class="status ${x.passed ? "ACTIVE" : "WATCH"}">${esc(x.gate)}</span><small>评分 ${n(Number(x.score || 0), 3)} · OOS 收益 ${pct(Number(o.total_return || 0) * 100, 2)} · 夏普 ${n(o.sharpe, 2)} · 最大回撤 ${pct(o.max_drawdown_pct, 2)} · 交易 ${Number(o.trade_count || 0)} 笔</small><small>${p.session_id ? `PAPER ${esc(p.status)} · 权益 ${money(pm.equity ?? p.current_cash)} · 回撤 ${pct(pm.max_drawdown_pct ?? 0, 2)}` : "尚未进入 PAPER 观察"}</small></div>`; }).join("") : "暂无可比较策略";
     $("rl-paper").innerHTML = sessions.length ? sessions.map(x => { const m = x.metrics || {}; return `<div class="list-row"><b>${esc(x.name)}</b><span class="status ${esc(x.status)}">${esc(x.status)}</span><small>已实现资金 ${money(x.current_cash)} / 初始 ${money(x.initial_cash)}</small><small>权益 ${money(m.equity ?? x.current_cash)} · 未实现 ${money(m.unrealized_pnl ?? 0)} · 最大回撤 ${pct(m.max_drawdown_pct ?? 0, 2)} · 已平仓 ${Number(m.trades || 0)} 笔</small><small>${m.engine === "AUTO_MARKET_PAPER_V1" ? "自动行情驱动 PAPER" : "手动 PAPER"} · ${m.last_processed_candle ? "更新 " + esc(m.last_processed_candle) : "等待行情"}</small></div>`; }).join("") : "暂无 PAPER 观察账户";
@@ -1274,6 +1301,41 @@ async function loadResearchLab() {
   } catch (e) {
     ["rl-tasks","rl-candidates","rl-compare","rl-paper","rl-paper-trades"].forEach(id => $(id).textContent = "加载失败：" + e.message);
   }
+}
+async function loadFactorExperiment(taskId) {
+  const panel = $("rl-experiment");
+  panel.textContent = "加载中…";
+  try {
+    const {result} = await api("/factors/research/tasks/" + encodeURIComponent(taskId));
+    const data = result.dataset;
+    const research = result.discovery;
+    const tested = research.candidates.filter(item => item.holdout);
+    const changes = result.discovery_library || [];
+    const sampleText = rates => Object.entries(rates).map(([name, item]) =>
+      name + " " + (item.rank_ic == null ? item.status || "样本不足" : n(item.rank_ic, 4))).join(" · ");
+
+    panel.innerHTML = `<div class="list-row"><b>数据集 ${esc(data.dataset_id.slice(0, 12))}</b>
+      <small>${esc(research.status)} · ${data.bars.length} 根已收盘 K 线 · 断档 ${data.quality.gaps?.length || 0} 处</small></div>`
+      + tested.map(item => `<div class="list-row"><b>${esc(JSON.stringify(item.expression))}</b>
+        <small>${esc(item.status)} · 样本外 Rank IC ${n(item.holdout.rank_ic, 4)} · 校正 p 值 ${n(item.holdout.adjusted_p_value, 4)}</small>
+      </div>`).join("")
+      + changes.map(event => `<div class="list-row">
+        <b>${esc(event.factor_name.slice(0, 12))} · ${esc(event.status)}</b>
+        <small>${esc(event.previous_status)} → ${esc(event.status)} · ${esc(event.verdict)}</small>
+        ${event.primary ? `<small>跨资产 Rank IC ${esc(sampleText(event.assets))}</small>
+        <small>市场状态 Rank IC ${esc(sampleText(event.primary.by_regime))}</small>
+        <small>净收益 ${pct(event.primary.net_return_per_interval * 100, 3)} · 容量第 10 百分位 ${money(event.primary.capacity_p10_usd)} · 组合增量 ${event.portfolio.incremental_net == null ? "样本不足" : pct(event.portfolio.incremental_net * 100, 3)}</small>` : ""}
+      </div>`).join("")
+      + `<button id="rl-replay" class="btn">复算本次发现</button><small id="rl-replay-result"></small>`;
+    $("rl-replay").addEventListener("click", async () => {
+      const label = $("rl-replay-result");
+      label.textContent = "复算中…";
+      try {
+        const replay = await api("/factors/research/tasks/" + encodeURIComponent(taskId) + "/replay", {method: "POST"});
+        label.textContent = replay.match ? "与已归档实验一致" : "复算与归档不同";
+      } catch (error) { label.textContent = error.message; }
+    });
+  } catch (error) { panel.textContent = "加载失败：" + error.message; }
 }
 async function enqueueResearchTask() {
   try {
@@ -1293,7 +1355,7 @@ async function loadFactors() {
     el.innerHTML = `
       <div class="card">
         <h2>因子研究 · 发起一次研究</h2>
-        <div class="muted" style="font-size:12px;margin-bottom:10px">六个 AI 分别提出候选因子，服务器用历史 K 线计算 IC、ICIR、命中率与覆盖率并决定是否收录进因子库。通过验证且处于 ACTIVE 的因子会进入实时信号计算，并作为证据传入六 AI 决策上下文；因子本身不会绕过风控直接下单。</div>
+        <div class="muted" style="font-size:12px;margin-bottom:10px">六个 AI 分别提出候选因子，服务器用历史 K 线计算 IC、ICIR、命中率与覆盖率并决定是否收录进因子库。通过验证且处于 ACTIVE 的因子会进入实时信号计算，并作为证据传入个人决策上下文；因子本身不会绕过风控直接下单。</div>
         <div class="grid2">
           <div class="field"><label>交易对</label><input id="fa-symbol" value="BTCUSDT" placeholder="BTCUSDT"></div>
           <div class="field"><label>K 线周期</label>

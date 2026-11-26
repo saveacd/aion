@@ -31,7 +31,9 @@ import dev.aion.app.AppContainer
 import dev.aion.app.ui.components.AionCard
 import dev.aion.app.ui.theme.AionColors
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.JsonPrimitive
 
 @Composable
@@ -53,6 +55,12 @@ fun ResearchLabScreen(container: AppContainer) {
     var paperTrades by remember { mutableStateOf<List<JsonObject>>(emptyList()) }
     var symbol by remember { mutableStateOf("BTCUSDT") }
     var interval by remember { mutableStateOf("15m") }
+    var horizon by remember { mutableStateOf("8") }
+    var selectedTask by remember { mutableStateOf<String?>(null) }
+    var experiment by remember { mutableStateOf<JsonObject?>(null) }
+    var experimentError by remember { mutableStateOf<String?>(null) }
+    var replayMessage by remember { mutableStateOf<String?>(null) }
+    var replaying by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -127,6 +135,20 @@ fun ResearchLabScreen(container: AppContainer) {
     }
     LaunchedEffect(Unit) { refresh() }
 
+    LaunchedEffect(selectedTask) {
+        experiment = null
+        experimentError = null
+        replayMessage = null
+        val id = selectedTask ?: return@LaunchedEffect
+        try {
+            experiment = container.api.api().researchTask(id)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            experimentError = e.message ?: "实验读取失败"
+        }
+    }
+
     approvalTarget?.let { target ->
         AlertDialog(
             onDismissRequest = { approvalTarget = null },
@@ -166,6 +188,8 @@ fun ResearchLabScreen(container: AppContainer) {
                     Text("后台研究任务 · 因子验证 · 策略候选 · PAPER 观察", color = AionColors.Muted)
                     OutlinedTextField(value = symbol, onValueChange = { symbol = it.uppercase() }, label = { Text("交易对") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                     OutlinedTextField(value = interval, onValueChange = { interval = it }, label = { Text("K线周期") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    OutlinedTextField(value = horizon, onValueChange = { horizon = it.filter(Char::isDigit).take(3) },
+                        label = { Text("预测长度（K 线根数，1–100）") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = {
                             scope.launch {
@@ -173,12 +197,12 @@ fun ResearchLabScreen(container: AppContainer) {
                                     container.api.api().enqueueResearchTask(JsonObject(mapOf(
                                         "symbol" to JsonPrimitive(symbol),
                                         "interval" to JsonPrimitive(interval),
-                                        "horizon_bars" to JsonPrimitive(8),
+                                        "horizon_bars" to JsonPrimitive(horizon.toIntOrNull() ?: 8),
                                     )))
                                     refresh()
                                 } catch (e: Exception) { error = e.message ?: "任务提交失败" }
                             }
-                        }, enabled = !loading && symbol.length >= 3) { Text("提交研究任务") }
+                        }, enabled = !loading && symbol.length >= 3 && (horizon.toIntOrNull() ?: 0) in 1..100) { Text("提交研究任务") }
                         Button(onClick = { refresh() }, enabled = !loading) { Text("刷新") }
                     }
                     Text("研究模块仅生成研究记录，不具备交易所下单权限。", color = AionColors.Muted, style = MaterialTheme.typography.bodySmall)
@@ -195,6 +219,45 @@ fun ResearchLabScreen(container: AppContainer) {
                     Text("${row["symbol"]?.toString()?.trim('"') ?: "—"} · ${row["interval"]?.toString()?.trim('"') ?: "—"}", color = AionColors.Text)
                     Text("状态：${row["status"]?.toString()?.trim('"') ?: "—"}", color = AionColors.Primary)
                     Text("创建：${row["created_at"]?.toString()?.trim('"') ?: "—"}", color = AionColors.Muted, style = MaterialTheme.typography.bodySmall)
+                    val taskId = row.value("id")
+                    if (taskId != "—") {
+                        TextButton(onClick = {
+                            selectedTask = if (selectedTask == taskId) null else taskId
+                        }, enabled = !replaying) {
+                            Text(if (selectedTask == taskId) "收起验证详情" else "查看验证详情")
+                        }
+                        if (selectedTask == taskId) {
+                            experimentError?.let { Text(it, color = AionColors.Red) }
+                            val result = experiment?.get("result") as? JsonObject
+                            val discovery = result?.get("discovery") as? JsonObject
+                            val data = result?.get("dataset") as? JsonObject
+                            if (result != null && discovery != null && data != null) {
+                                ExperimentDetails(discovery, data, result)
+                                Button(onClick = {
+                                    replaying = true
+                                    scope.launch {
+                                        try {
+                                            val replay = container.api.api().replayResearch(taskId)
+                                            replayMessage = if (replay.value("match") == "true")
+                                                "与归档一致 · 已匹配 ${replay.value("matched_validation_runs")} 项验证"
+                                            else "复算结果与归档不同"
+                                        } catch (e: kotlinx.coroutines.CancellationException) {
+                                            throw e
+                                        } catch (e: Exception) {
+                                            replayMessage = e.message ?: "实验复算失败"
+                                        } finally {
+                                            replaying = false
+                                        }
+                                    }
+                                }, enabled = !replaying) { Text(if (replaying) "复算中…" else "复算归档实验") }
+                                replayMessage?.let { Text(it, color = AionColors.Muted) }
+                            } else if (experiment != null) {
+                                Text("任务暂无归档的独立验证结果", color = AionColors.Muted)
+                            } else if (experimentError == null) {
+                                CircularProgressIndicator()
+                            }
+                        }
+                    }
                     row["error"]?.let { Text(it.toString(), color = AionColors.Red) }
                 }
             }
@@ -306,5 +369,45 @@ fun ResearchLabScreen(container: AppContainer) {
             } }
         }
         item { Spacer(Modifier.height(20.dp)) }
+    }
+}
+
+private fun JsonObject.value(name: String): String = (get(name) as? JsonPrimitive)?.contentOrNull ?: "—"
+
+@Composable
+private fun ExperimentDetails(discovery: JsonObject, dataset: JsonObject, result: JsonObject) {
+    Text("数据集 ${dataset.value("dataset_id").take(12)} · ${discovery.value("status")}", color = AionColors.Primary)
+    val candidates = (discovery["candidates"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
+    val quality = dataset["quality"] as? JsonObject
+    val gaps = (quality?.get("gaps") as? JsonArray)?.size ?: 0
+    Text("${candidates.size} 个表达式 · ${(dataset["bars"] as? JsonArray)?.size ?: 0} 根已收盘 K 线 · 断档 $gaps 处", color = AionColors.Muted)
+    candidates.forEach { candidate ->
+        val holdout = candidate["holdout"] as? JsonObject ?: return@forEach
+        Text(candidate["expression"].toString(), color = AionColors.Text)
+        Text("${candidate.value("status")} · IC ${holdout.value("ic")} · Rank IC ${holdout.value("rank_ic")}", color = AionColors.Muted)
+        Text("ICIR ${holdout.value("icir")} · 校正 p 值 ${holdout.value("adjusted_p_value")}", color = AionColors.Muted)
+    }
+    (result["discovery_library"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }.forEach { event ->
+        Text("${event.value("factor_name").take(12)} · ${event.value("previous_status")} → ${event.value("status")}", color = AionColors.Primary)
+        val primary = event["primary"] as? JsonObject
+        val portfolio = event["portfolio"] as? JsonObject
+        val sources = event["assets"] as? JsonObject
+        sources?.forEach { (asset, metrics) ->
+            val scored = metrics as? JsonObject ?: return@forEach
+            Text("$asset · ${scored.value("status")} · Rank IC ${scored.value("rank_ic")}", color = AionColors.Muted)
+        }
+        primary?.let {
+            Text("净收益 ${it.value("net_return_per_interval")} · 换手 ${it.value("turnover_per_interval")}", color = AionColors.Muted)
+            Text("容量 ${it.value("capacity_p10_usd")} USD · 平均滑点 ${it.value("average_round_trip_slippage_bps")} bps", color = AionColors.Muted)
+            val regime = it["by_regime"] as? JsonObject
+            val time = it["by_time"] as? JsonArray
+            val regimes = regime.orEmpty().mapNotNull { (label, metrics) ->
+                (metrics as? JsonObject)?.let { row -> "$label ${row.value("rank_ic")}" }
+            }
+            if (regimes.isNotEmpty()) Text("市场状态 Rank IC · " + regimes.joinToString(" / "), color = AionColors.Muted)
+            val windows = time.orEmpty().mapNotNull { row -> (row as? JsonObject)?.value("rank_ic") }
+            if (windows.isNotEmpty()) Text("时间分段 Rank IC · " + windows.joinToString(" / "), color = AionColors.Muted)
+        }
+        portfolio?.let { Text("组合增量 ${it.value("incremental_net")}", color = AionColors.Muted) }
     }
 }

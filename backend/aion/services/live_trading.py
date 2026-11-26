@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from aion.core.config import Settings, TradingMode
 from aion.core.crypto import SecretBox
+from aion.core.redis import distributed_lock
 from aion.exchange.client import MAINNET_BASE_URL, TESTNET_BASE_URL, BinanceFuturesClient
 from aion.exchange.errors import (
     BinanceAPIError,
@@ -38,7 +39,7 @@ from aion.exchange.errors import (
 from aion.exchange.symbols import SymbolRules
 from aion.execution.engine import ExecutionEngine
 from aion.execution.reconcile import reconcile
-from aion.execution.state import from_exchange_status
+from aion.execution.state import TERMINAL_STATES, OrderState, can_transition, from_exchange_status
 from aion.models import (
     AccountSnapshot,
     AgentMessage,
@@ -50,8 +51,10 @@ from aion.models import (
     OrderEvent,
     PositionSnapshot,
     RiskDecision,
+    Strategy,
     TradeIntent,
     TradeOutcome,
+    TradingControlState,
 )
 from aion.models.base import utcnow
 from aion.services.events import publish_event
@@ -62,7 +65,6 @@ logger = logging.getLogger(__name__)
 D = Decimal
 D0 = D("0")
 LIVE_MODES = ("TESTNET", "MAINNET")
-MAX_HOLDING_HOURS = 48
 _RECONCILE_LOCK = asyncio.Lock()
 _RULES_CACHE: dict[tuple[str, str], tuple[SymbolRules, float]] = {}
 _RULES_TTL_SECONDS = 3600.0
@@ -73,7 +75,8 @@ def _now_ts() -> float:
 
 
 async def resolve_live_client(
-    db: AsyncSession, settings: Settings, user_id: uuid.UUID, mode: str
+    db: AsyncSession, settings: Settings, user_id: uuid.UUID, mode: str,
+    *, allow_operator_fallback: bool = True,
 ) -> BinanceFuturesClient | None:
     """Return a signed client for this user/mode, or None when unavailable."""
     if mode not in LIVE_MODES:
@@ -95,7 +98,7 @@ async def resolve_live_client(
         api_key = box.try_decrypt(row.api_key_enc) or ""
         api_secret = box.try_decrypt(row.api_secret_enc) or ""
 
-    if not (api_key and api_secret):
+    if allow_operator_fallback and not (api_key and api_secret):
         # Single-tenant deployments may configure the operator key in env. Only
         # use it when the deployment itself is in that exact mode.
         active = settings.resolve_trading_mode().value
@@ -308,22 +311,28 @@ async def execute_live_entry(
     """Send an approved intent to the real exchange and register protection."""
     if mode not in LIVE_MODES:
         raise ValueError(f"unsupported live mode: {mode}")
-    # MAINNET double-check (audit #8): the 24h armed marker is set only by a
-    # successful fresh-TOTP verification at autopilot enable time. Without it,
-    # no mainnet order leaves this process.
-    if mode == "MAINNET" and settings.require_totp_for_mainnet:
-        from aion.core.redis import get_redis
-
-        try:
-            armed = await get_redis().get(f"aion:mainnet:armed:{user_id}")
-        except Exception:  # noqa: BLE001 - redis down = not armed (fail closed)
-            armed = None
-        if not armed:
-            raise PermissionError(
-                "主网自动交易未武装：需要在启用主网自动执行时通过 TOTP 二次验证（24 小时有效）。"
-            )
+    if (
+        intent.user_id != user_id or decision.user_id != user_id or not decision.approved
+        or decision.intent_id != intent.id or decision.mode != mode or intent.mode != mode
+    ):
+        raise PermissionError("live entry requires a matching approved account risk decision")
+    if mode == "MAINNET" and not settings.mainnet_enabled:
+        raise PermissionError("mainnet is disabled")
     async with session_factory() as db:
-        client = await resolve_live_client(db, settings, user_id, mode)
+        controls = await db.get(TradingControlState, 1)
+        if controls is not None and (controls.emergency_stop or controls.stop_new_trades or controls.pause_ai):
+            raise PermissionError("system controls block new exposure")
+        config = await db.get(AutopilotConfig, user_id)
+        if config is None or not config.enabled or not config.auto_execute or config.execution_mode != mode:
+            raise PermissionError("account automatic execution is disabled for this mode")
+        if intent.strategy_id is not None:
+            strategy = await db.get(Strategy, intent.strategy_id)
+            if strategy is None or strategy.user_id != user_id or strategy.state != "ACTIVE":
+                raise PermissionError("strategy must belong to this account and be active")
+    if config.live_authorized_at is None:
+        raise PermissionError("live autopilot requires explicit account authorization")
+    async with session_factory() as db:
+        client = await resolve_live_client(db, settings, user_id, mode, allow_operator_fallback=False)
     if client is None:
         return None
 
@@ -343,7 +352,7 @@ async def execute_live_entry(
         order = await engine.submit(intent, decision, rules)
 
         # A market order may come back ACKNOWLEDGED; confirm once.
-        if order.status not in ("FILLED", "REJECTED", "CANCELED") and (
+        if order.status not in TERMINAL_STATES and (
             order.avg_fill_price is None or D(order.filled_quantity) <= 0
         ):
             try:
@@ -351,18 +360,17 @@ async def execute_live_entry(
                     symbol=order.symbol, client_order_id=order.client_order_id
                 )
                 async with session_factory() as db:
-                    fresh = await db.get(Order, order.id)
+                    fresh = await db.get(Order, order.id, with_for_update=True)
                     if fresh is not None:
                         # Map through the state machine instead of trusting the
                         # raw exchange status string (fix #6: EXPIRED etc. must
                         # land in a state the order state machine knows).
-                        mapped = from_exchange_status(ack.status).value
-                        fresh.status = (
-                            mapped if mapped != "UNKNOWN" else fresh.status
-                        )
+                        mapped = from_exchange_status(ack.status)
+                        if mapped is not OrderState.UNKNOWN and can_transition(fresh.status, mapped):
+                            fresh.status = mapped.value
                         fresh.exchange_order_id = ack.order_id or fresh.exchange_order_id
-                        fresh.filled_quantity = ack.executed_qty
-                        fresh.avg_fill_price = ack.avg_price
+                        fresh.filled_quantity = max(D(fresh.filled_quantity or 0), D(ack.executed_qty or 0))
+                        fresh.avg_fill_price = ack.avg_price or fresh.avg_fill_price
                         fresh.last_exchange_response = ack.raw
                         db.add(
                             OrderEvent(
@@ -852,10 +860,9 @@ async def _sync_user_mode(
         cfg = await db.get(AutopilotConfig, user_id)
     if client is None:
         return
-    hold_limit_minutes = (
-        int(cfg.max_holding_minutes) if cfg and cfg.intraday else int(MAX_HOLDING_HOURS * 60)
-    )
+    hold_limit_minutes = int(cfg.max_holding_minutes) if cfg and cfg.intraday else None
     try:
+        await ExecutionEngine(client, session_factory).recover_pending(user_id=user_id, mode=mode)
         info = await client.account_info()
         open_positions = [p for p in await client.positions() if p.is_open]
 
@@ -1034,7 +1041,7 @@ async def _sync_user_mode(
                         exit_reason = "TP"
                 if exit_reason is None:
                     age_minutes = (utcnow() - position.opened_at).total_seconds() / 60
-                    if age_minutes >= hold_limit_minutes:
+                    if hold_limit_minutes is not None and age_minutes >= hold_limit_minutes:
                         exit_reason = "TIMEOUT"
             if exit_reason is not None:
                 await close_live_position(
@@ -1084,9 +1091,13 @@ async def reconcile_live_accounts(
             if uid is None or mode not in LIVE_MODES:
                 continue
             targets.add((uid if isinstance(uid, uuid.UUID) else uuid.UUID(str(uid)), str(mode)))
+        completed = 0
         for uid, mode in targets:
-            await _sync_user_mode(session_factory, settings, uid, mode)
-        return len(targets)
+            async with distributed_lock(f"execution-account:{uid}:{mode}", ttl_seconds=120, wait_seconds=0) as acquired:
+                if acquired:
+                    await _sync_user_mode(session_factory, settings, uid, mode)
+                    completed += 1
+        return completed
 
 
 async def run_reconcile_forever(
@@ -1120,14 +1131,14 @@ async def _apply_order_update(
                 Order.client_order_id == update.client_order_id,
                 Order.exchange_order_id == update.order_id,
             ),
-        )
+        ).with_for_update()
     )
     if order is None:
         return False
     previous = order.status
-    mapped = from_exchange_status(update.status).value
-    if mapped != "UNKNOWN":
-        order.status = mapped
+    mapped = from_exchange_status(update.status)
+    if mapped is not OrderState.UNKNOWN and can_transition(previous, mapped):
+        order.status = mapped.value
     if update.cum_filled_qty is not None:
         order.filled_quantity = max(D(order.filled_quantity or 0), D(update.cum_filled_qty))
     if update.avg_price and update.avg_price > 0:
@@ -1141,9 +1152,12 @@ async def _apply_order_update(
         and update.last_filled_qty > 0
         and update.last_price > 0
     ):
-        exchange_trade_id = f"{update.symbol}:{update.trade_id}"[:64]
+        exchange_trade_id = f"{order.id.hex}:{update.trade_id}"[:64]
+        legacy_trade_id = f"{update.symbol}:{update.trade_id}"[:64]
         already_recorded = await db.scalar(
-            select(Fill.id).where(Fill.exchange_trade_id == exchange_trade_id)
+            select(Fill.id).where(
+                Fill.order_id == order.id, Fill.exchange_trade_id.in_((exchange_trade_id, legacy_trade_id)),
+            )
         )
         if already_recorded is None:
             qty = D(update.last_filled_qty)

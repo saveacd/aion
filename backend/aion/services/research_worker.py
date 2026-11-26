@@ -3,11 +3,13 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
-import uuid
 import logging
+import os
+from bisect import bisect_right
 from decimal import Decimal
+
 from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from aion.core.redis import distributed_lock
 from aion.models.research import FactorResearchTask, ResearchTaskLog
@@ -24,10 +26,15 @@ async def _log(db: AsyncSession, task: FactorResearchTask, event: str, message: 
 
 async def process_one(session_factory: async_sessionmaker, settings) -> bool:
     """Claim and process at most one queued task. Returns whether work was found."""
+    from aion.quant.datasets import restore_candles
+    from aion.quant.factor_discovery import discover
     from aion.services.agent_service import (
-        build_gateway, resolve_provider_config,
+        build_gateway,
+        resolve_provider_config,
     )
-    from aion.services.factor_service import run_factor_research
+    from aion.services.discovery_library import persist_discovery
+    from aion.services.factor_service import freeze_research_dataset, run_factor_research
+    from aion.services.market_research import research_symbols
 
     async with session_factory() as db:
         task = await db.scalar(
@@ -41,6 +48,17 @@ async def process_one(session_factory: async_sessionmaker, settings) -> bool:
         task.attempts += 1
         task.started_at = dt.datetime.now(dt.UTC)
         task.error = None
+        dataset = task.result.get("dataset")
+        peers = task.result.get("peer_datasets")
+        if dataset is None and task.user_id is not None:
+            dataset = await freeze_research_dataset(db, task.symbol, task.interval, task.started_at)
+        if peers is None and dataset is not None:
+            cutoff = dt.datetime.fromisoformat(dataset["as_of"])
+            cohort = [symbol for symbol in research_symbols(settings) if symbol != task.symbol][:2]
+            peers = {}
+            for symbol in cohort:
+                peers[symbol] = await freeze_research_dataset(db, symbol, task.interval, cutoff)
+        task.result = {**task.result, "dataset": dataset, "peer_datasets": peers}
         await _log(db, task, "TASK_STARTED", "Factor research task claimed.")
         await db.commit()
         task_id, user_id = task.id, task.user_id
@@ -56,29 +74,49 @@ async def process_one(session_factory: async_sessionmaker, settings) -> bool:
         return True
 
     try:
+        if dataset is None:
+            raise RuntimeError("research task did not capture a dataset")
+        discovery = await asyncio.to_thread(discover, dataset, horizon)
+        peers = peers or {}
+        report = {"dataset": dataset, "peer_datasets": peers, "discovery": discovery,
+                  "candles_used": len(dataset["bars"])}
         async with session_factory() as db:
+            task_row = await db.get(FactorResearchTask, task_id, with_for_update=True)
+            if task_row is not None:
+                if "discovery_adoption" in task_row.result:
+                    report.update({key: task_row.result.get(key) for key in (
+                        "discovery_adoption", "discovery_library", "discovery_watermark"
+                    )})
+                else:
+                    persisted = await persist_discovery(db, task_row, dataset, peers, discovery)
+                    report["discovery_library"] = persisted["changes"]
+                    report["discovery_watermark"] = persisted["discovery_watermark"]
+                    report["discovery_adoption"] = persisted["adoption"]
+                task_row.result = report
+                await db.commit()
+
             provider_config = await resolve_provider_config(db, user_id)
-            if provider_config is None:
-                raise RuntimeError("No model provider configured for this user.")
-            gateway = build_gateway(settings, session_factory, provider_config)
-            import os
-            report = await asyncio.wait_for(
-                run_factor_research(
-                    db=db, gateway=gateway, symbol=symbol, interval=interval,
-                    horizon_bars=horizon, user_id=user_id, session_factory=session_factory,
-                ),
-                timeout=max(60, int(os.environ.get("AION_RESEARCH_TASK_TIMEOUT_SECONDS", "900"))),
-            )
-            if report is None:
-                raise RuntimeError("Research pipeline could not start.")
+            if provider_config is not None and dataset["quality"]["eligible"]:
+                gateway = build_gateway(settings, session_factory, provider_config)
+                legacy = await asyncio.wait_for(
+                    run_factor_research(
+                        db=db, gateway=gateway, symbol=symbol, interval=interval,
+                        horizon_bars=horizon, user_id=user_id, session_factory=session_factory,
+                        dataset=dataset,
+                    ),
+                    timeout=max(60, int(os.environ.get("AION_RESEARCH_TASK_TIMEOUT_SECONDS", "900"))),
+                )
+                if legacy is not None:
+                    report.update(legacy)
             # Deterministic OOS lifecycle check follows every successful mining run.
-            from aion.services.factor_service import refresh_factor_lifecycle, list_factors, load_candles
             from aion.quant.factor_signals import build_factor_signals
             from aion.quant.strategy_evolution import build_strategy_evolution
-            await refresh_factor_lifecycle(db, user_id, symbol)
-            await db.commit()
-            factors = await list_factors(db, user_id, symbol)
-            candles = await load_candles(db, symbol, interval)
+            from aion.services.factor_service import list_factors, refresh_factor_lifecycle
+            if dataset["quality"]["eligible"]:
+                await refresh_factor_lifecycle(db, user_id, symbol)
+                await db.commit()
+            factors = await list_factors(db, user_id, symbol, interval=interval, active_only=True)
+            candles = restore_candles(dataset) if dataset["quality"]["eligible"] else []
             if factors and candles:
                 intelligence = build_factor_signals(
                     [f for f in factors if f.status == "ACTIVE"], candles
@@ -99,32 +137,25 @@ async def process_one(session_factory: async_sessionmaker, settings) -> bool:
                     intelligence.get("factor_signals", intelligence),
                     intelligence.get("market_regime", {}),
                 )
-                from aion.models.research import StrategyCandidate, StrategyBacktest
+                from aion.models.research import StrategyBacktest, StrategyCandidate
                 from aion.quant.strategy_research import evaluate_factor_strategy
-                from aion.models.market import DerivativesSnapshot
-                # A funding settlement is accepted only when a derivative snapshot
-                # exists close to a canonical 00:00/08:00/16:00 UTC settlement.
-                funding_rows = (await db.execute(
-                    select(DerivativesSnapshot).where(
-                        DerivativesSnapshot.symbol == symbol,
-                        DerivativesSnapshot.captured_at >= candles[0].open_time - dt.timedelta(minutes=15),
-                        DerivativesSnapshot.captured_at <= candles[-1].close_time + dt.timedelta(minutes=15),
-                    ).order_by(DerivativesSnapshot.captured_at.asc())
-                )).scalars().all() if candles else []
+
+                settlements = [
+                    (dt.datetime.fromisoformat(item["t"]), Decimal(item["rate"]))
+                    for item in dataset.get("funding", [])
+                ]
+                openings = [candle.open_time for candle in candles]
                 funding_by_index = {}
-                expected_settlements = 0
-                matched_settlements = 0
-                for idx, candle in enumerate(candles):
-                    ts = candle.open_time.astimezone(dt.UTC)
-                    if ts.hour in (0, 8, 16) and ts.minute == 0:
-                        expected_settlements += 1
-                        nearest = min(funding_rows, key=lambda row: abs((row.captured_at - ts).total_seconds()), default=None)
-                        if nearest and abs((nearest.captured_at - ts).total_seconds()) <= 900:
-                            rate = nearest.funding_rate_avg_8h or nearest.funding_rate
-                            if rate is not None:
-                                funding_by_index[idx] = rate
-                                matched_settlements += 1
-                funding_complete = expected_settlements > 0 and matched_settlements == expected_settlements
+                for ts, rate in settlements:
+                    i = bisect_right(openings, ts) - 1
+                    if 0 <= i < len(candles) and ts <= candles[i].close_time:
+                        funding_by_index[i] = funding_by_index.get(i, Decimal(0)) + rate
+                max_gap = dt.timedelta(hours=8, minutes=2)
+                funding_complete = (
+                    bool(funding_by_index) and settlements[0][0] <= candles[0].open_time
+                    and candles[-1].close_time - settlements[-1][0] <= max_gap
+                    and all(b[0] - a[0] <= max_gap for a, b in zip(settlements, settlements[1:], strict=False))
+                )
                 strategy_items = evolution.get("candidate_strategies", [])
                 active_factors = [f for f in factors if f.status == "ACTIVE"]
                 if candles and strategy_items:
@@ -184,6 +215,7 @@ async def process_one(session_factory: async_sessionmaker, settings) -> bool:
                             "parameters": {},
                             "risk_notes": "Candidate only; not executable. Require walk-forward, fees/slippage, drawdown and PAPER evaluation.",
                             "research_run_id": report.get("run_id"),
+                            "dataset_id": dataset["dataset_id"],
                             "symbol": symbol,
                             "interval": interval,
                             "market_regime": intelligence.get("market_regime", {}),
@@ -273,28 +305,32 @@ async def process_one(session_factory: async_sessionmaker, settings) -> bool:
 async def schedule_daily_research(session_factory: async_sessionmaker, settings) -> int:
     """Create one budget-bounded daily task per configured user and default symbol."""
     from aion.models.auth import User
-    from aion.services.agent_service import resolve_provider_config
+    from aion.models.factors import FactorRecord
+    from aion.quant.factor_values import DSL_FORMULA
+    from aion.services.discovery_library import OBSERVABLE
+
     today = dt.datetime.now(dt.UTC).date().isoformat()
     created = 0
     async with session_factory() as db:
-        users = (await db.execute(select(User).where(User.is_active.is_(True)))).scalars().all()
-        for user in users:
-            if await resolve_provider_config(db, user.id) is None:
+        users = (await db.scalars(select(User.id).where(User.is_active.is_(True)))).all()
+        default = {(user, symbol, "1h", 8) for user in users for symbol in settings.default_symbols[:1]}
+        monitored = (await db.execute(select(
+            FactorRecord.user_id, FactorRecord.symbol, FactorRecord.interval, FactorRecord.horizon_bars,
+        ).where(FactorRecord.user_id.in_(users), FactorRecord.formula == DSL_FORMULA,
+                FactorRecord.status.in_(OBSERVABLE)).distinct())).all()
+        for user_id, symbol, interval, horizon in default.union(tuple(row) for row in monitored):
+            key = f"auto:{today}:{symbol}:{interval}:{horizon}"
+            legacy_key = f"auto:{today}:{symbol}:{interval}" if horizon == 8 else key
+            existing = await db.scalar(select(FactorResearchTask.id).where(
+                FactorResearchTask.user_id == user_id,
+                FactorResearchTask.idempotency_key.in_((key, legacy_key)),
+            ))
+            if existing:
                 continue
-            for symbol in settings.default_symbols[:1]:
-                key = f"auto:{today}:{symbol}:1h"
-                existing = await db.scalar(select(FactorResearchTask.id).where(
-                    FactorResearchTask.user_id == user.id,
-                    FactorResearchTask.idempotency_key == key,
-                ))
-                if existing:
-                    continue
-                db.add(FactorResearchTask(
-                    user_id=user.id, symbol=symbol, interval="1h",
-                    horizon_bars=8, idempotency_key=key,
-                    status="QUEUED", attempts=0, result={},
-                ))
-                created += 1
+            db.add(FactorResearchTask(user_id=user_id, symbol=symbol, interval=interval,
+                                      horizon_bars=horizon, idempotency_key=key,
+                                      status="QUEUED", attempts=0, result={}))
+            created += 1
         await db.commit()
     return created
 

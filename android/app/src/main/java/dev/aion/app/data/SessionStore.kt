@@ -9,8 +9,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import java.net.URLEncoder
 
 /**
- * Session material lives in EncryptedSharedPreferences. Only the backend URL,
- * access/refresh tokens and the username are stored; no password, no exchange
+ * Session material lives in EncryptedSharedPreferences. Only access/refresh
+ * tokens and the username are stored; no password, no exchange
  * key, no model key is ever persisted on the device.
  */
 class SessionStore(context: Context) {
@@ -25,7 +25,16 @@ class SessionStore(context: Context) {
             masterKey,
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-        )
+        ).also { storage ->
+            val previousUrl = storage.getString(LEGACY_BACKEND_URL, null)
+            if (previousUrl != null) {
+                val editor = storage.edit().remove(LEGACY_BACKEND_URL)
+                if (previousUrl != BuildConfig.AION_BASE_URL) {
+                    editor.remove(KEY_ACCESS).remove(KEY_REFRESH).remove(KEY_USERNAME)
+                }
+                editor.apply()
+            }
+        }
     }
 
     val sessionFlow = MutableStateFlow(accessToken.isNullOrBlank().not())
@@ -81,6 +90,7 @@ class SessionStore(context: Context) {
 
     companion object {
         private const val FILE_NAME = "aion_session"
+        private const val LEGACY_BACKEND_URL = "backend_url"
         private const val KEY_ACCESS = "access_token"
         private const val KEY_REFRESH = "refresh_token"
         private const val KEY_USERNAME = "username"

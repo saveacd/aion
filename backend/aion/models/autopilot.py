@@ -53,6 +53,7 @@ class AutopilotConfig(Timestamped, Base):
     auto_execute: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # 执行账户：PAPER / TESTNET / MAINNET。真实模式必须由用户显式选择。
     execution_mode: Mapped[str] = mapped_column(String(16), nullable=False, default="PAPER")
+    live_authorized_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     symbols: Mapped[list[Any]] = mapped_column(nullable=False, default=list)
     # AI 等待区：价格进入区间时立即重新分析（日内抓点）。
     watch_plans: Mapped[list[Any]] = mapped_column(nullable=False, default=list)
@@ -61,7 +62,7 @@ class AutopilotConfig(Timestamped, Base):
     intraday: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     max_holding_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=240)
     cycle_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=600)
-    max_trades_per_day: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
+    max_trades_per_day: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     min_confidence: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False, default=Decimal("0.65"))
     strategy_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("strategies.id", ondelete="SET NULL")

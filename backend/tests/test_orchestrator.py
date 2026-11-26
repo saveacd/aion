@@ -211,6 +211,34 @@ def test_full_success_returns_candidate_without_executing() -> None:
     assert after == before
 
 
+def test_public_research_is_reused_for_different_account_decisions() -> None:
+    async def exercise() -> None:
+        research_runner, research_gateway = build(all_payloads())
+        research = await research_runner.research_market(context())
+        assert research is not None
+        assert set(research_gateway.calls) == {
+            "market_regime", "technical_analysis", "derivatives", "strategy_research",
+        }
+
+        flat_runner, flat_gateway = build(all_payloads())
+        flat = await flat_runner.analyze(context(), shared_research=research)
+        assert flat.is_trade
+
+        holding_runner, holding_gateway = build({
+            **all_payloads(),
+            "chief_decision": {**CHIEF_NO_TRADE, "position_action": "REDUCE"},
+        })
+        holding_ctx = context()
+        holding_ctx.inputs["managed_positions"] = [{"symbol": "BTCUSDT", "side": "LONG"}]
+        holding = await holding_runner.analyze(holding_ctx, shared_research=research)
+        assert holding.reasons == ["REDUCE: signal conflict"]
+        assert holding.trade_intent is None
+
+        assert flat_gateway.calls == holding_gateway.calls == ["chief_decision", "adversarial_review"]
+
+    asyncio.run(exercise())
+
+
 def test_agent_failure_degrades_to_no_trade() -> None:
     orchestrator, gateway = build(all_payloads(), fail={"derivatives"})
 

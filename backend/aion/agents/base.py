@@ -152,6 +152,11 @@ class DbRunRecorder:
             stats["model"] = model
 
         async with self._session_factory() as session:
+            # Parallel agents share a run. Serialize sequence allocation on the
+            # parent row without blocking foreign-key checks from model calls.
+            await session.execute(
+                select(AgentRun.id).where(AgentRun.id == run_id).with_for_update(key_share=True)
+            )
             current = await session.scalar(
                 select(func.coalesce(func.max(AgentMessage.seq), 0)).where(
                     AgentMessage.run_id == run_id
@@ -293,6 +298,9 @@ class BaseAgent:
             "inputs": sorted(ctx.inputs),
             "upstream": sorted(ctx.upstream),
         }
+
+        if research := ctx.inputs.get("market_research"):
+            payload["input_refs"]["market_research_version"] = research["version"]
 
         try:
             output = self.output_model.model_validate(payload)

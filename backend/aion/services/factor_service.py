@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 from decimal import Decimal as D
 from typing import Any
@@ -12,12 +13,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from aion.agents.base import DbRunRecorder, NullRunRecorder
 from aion.agents.factor_research import FactorResearchOrchestrator
 from aion.models.factors import FactorRecord
-from aion.models.research import FactorVersion, FactorLifecycleEvent, FactorValidationResult
-from aion.models.market import MarketCandle
+from aion.models.market import MarketCandle, MarketFundingSettlement
+from aion.models.research import FactorLifecycleEvent, FactorValidationResult, FactorVersion
 from aion.quant.factor_lifecycle import assess_factor_lifecycle
+from aion.quant.factor_values import DSL_FORMULA
 
 #: Enough history for lookback*3 windows plus horizon labels.
-CANDLE_LOAD_LIMIT = 600
+CANDLE_LOAD_LIMIT = 1800
 
 
 async def load_candles(
@@ -25,6 +27,7 @@ async def load_candles(
     symbol: str,
     interval: str,
     limit: int = CANDLE_LOAD_LIMIT,
+    *, as_of: dt.datetime | None = None,
 ) -> list[MarketCandle]:
     rows = (
         (
@@ -34,6 +37,7 @@ async def load_candles(
                     MarketCandle.symbol == symbol,
                     MarketCandle.interval == interval,
                     MarketCandle.is_final.is_(True),
+                    MarketCandle.close_time <= (as_of or dt.datetime.now(dt.UTC)),
                 )
                 .order_by(MarketCandle.open_time.desc())
                 .limit(limit)
@@ -45,6 +49,19 @@ async def load_candles(
     return list(reversed(rows))
 
 
+async def freeze_research_dataset(db: AsyncSession, symbol: str, interval: str, as_of: dt.datetime) -> dict:
+    from aion.quant.datasets import freeze_candles
+
+    candles = await load_candles(db, symbol, interval, as_of=as_of)
+    funding = []
+    if candles:
+        funding = (await db.scalars(select(MarketFundingSettlement).where(
+            MarketFundingSettlement.symbol == symbol, MarketFundingSettlement.settled_at <= as_of,
+            MarketFundingSettlement.settled_at >= candles[0].open_time - dt.timedelta(hours=8),
+        ).order_by(MarketFundingSettlement.settled_at))).all()
+    return freeze_candles(candles, symbol=symbol, interval=interval, as_of=as_of, funding=funding)
+
+
 async def run_factor_research(
     *,
     db: AsyncSession,
@@ -54,6 +71,7 @@ async def run_factor_research(
     horizon_bars: int,
     user_id: uuid.UUID | None = None,
     session_factory: Any | None = None,
+    dataset: dict | None = None,
 ) -> dict[str, Any] | None:
     """One research cycle; returns the report dict or None when it can't start.
 
@@ -70,8 +88,8 @@ async def run_factor_research(
         recorder = NullRunRecorder()
     orchestrator = FactorResearchOrchestrator(gateway, recorder)
 
-    candles = await load_candles(db, symbol, interval)
-    payload = [
+    candles = await load_candles(db, symbol, interval) if dataset is None else []
+    payload = dataset["bars"] if dataset is not None else [
         {
             "t": c.open_time.isoformat(),
             "o": str(c.open),
@@ -91,7 +109,7 @@ async def run_factor_research(
         user_id=user_id,
     )
     report_dict = report.to_dict()
-    report_dict["candles_used"] = len(candles)
+    report_dict["candles_used"] = len(payload)
     await persist_factors(db, report_dict, user_id=user_id)
     return report_dict
 
@@ -119,6 +137,8 @@ async def persist_factors(
                 FactorRecord.factor_name == row["factor_name"],
             )
         )
+        if existing is not None and existing.formula == DSL_FORMULA:
+            continue
         record = existing or FactorRecord(
             user_id=user_id,
             symbol=report["symbol"],
@@ -189,7 +209,8 @@ async def refresh_factor_lifecycle(
     query and can be reactivated only after passing the same holdout gate.
     """
     stmt = select(FactorRecord).where(
-        FactorRecord.user_id == user_id, FactorRecord.status.in_(["TESTING", "ACTIVE", "WATCH"])
+        FactorRecord.user_id == user_id, FactorRecord.formula != DSL_FORMULA,
+        FactorRecord.status.in_(["TESTING", "ACTIVE", "WATCH"])
     )
     if symbol:
         stmt = stmt.where(FactorRecord.symbol == symbol.upper())
@@ -210,8 +231,8 @@ async def refresh_factor_lifecycle(
             "future_data_policy": "factor values use current and prior bars; labels use strictly future horizon",
         }
         try:
-            from aion.quant.factors import evaluate_factor, FactorFormula
             from aion.quant.factor_lifecycle import should_retire_after_failures
+            from aion.quant.factors import FactorFormula, evaluate_factor
             stats = evaluate_factor(
                 candle_cache[key], FactorFormula(record.formula), int(record.lookback_bars),
                 int(record.horizon_bars), direction=str(record.direction),
@@ -280,6 +301,9 @@ async def list_factors(
     db: AsyncSession,
     user_id: uuid.UUID,
     symbol: str | None = None,
+    *,
+    interval: str | None = None,
+    active_only: bool = False,
 ) -> list[FactorRecord]:
     stmt = (
         select(FactorRecord)
@@ -289,6 +313,10 @@ async def list_factors(
     )
     if symbol:
         stmt = stmt.where(FactorRecord.symbol == symbol)
+    if interval:
+        stmt = stmt.where(FactorRecord.interval == interval)
+    if active_only:
+        stmt = stmt.where(FactorRecord.status == "ACTIVE")
     return list((await db.execute(stmt)).scalars().all())
 
 

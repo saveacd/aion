@@ -5,12 +5,14 @@ factor definitions into transparent current-bar signals for the LLM agents.
 """
 from __future__ import annotations
 
+import datetime as dt
 import math
 from collections.abc import Sequence
 from typing import Any
 
 from aion.models.factors import FactorRecord
-from aion.quant.factors import FactorFormula, compute_series
+from aion.quant.factor_values import DSL_FORMULA, factor_series, normalize_expression_value
+from aion.quant.factors import FactorFormula
 
 
 def _squash(value: float, scale: float) -> float:
@@ -32,6 +34,8 @@ def normalize_factor_value(formula: str, value: float) -> float:
         FactorFormula.TREND_EFFICIENCY: 0.5,
         FactorFormula.BREAKOUT_PRESSURE: 0.5,
     }
+    if formula == DSL_FORMULA:
+        return normalize_expression_value(value)
     parsed = FactorFormula(formula)
     if parsed is FactorFormula.VOLATILITY_RATIO:
         value -= 1.0
@@ -46,7 +50,7 @@ def _pearson(left: Sequence[float], right: Sequence[float]) -> float | None:
         return None
     a, b = list(left[-size:]), list(right[-size:])
     ma, mb = sum(a) / size, sum(b) / size
-    cov = sum((x - ma) * (y - mb) for x, y in zip(a, b))
+    cov = sum((x - ma) * (y - mb) for x, y in zip(a, b, strict=True))
     va = sum((x - ma) ** 2 for x in a)
     vb = sum((y - mb) ** 2 for y in b)
     den = math.sqrt(va * vb)
@@ -62,8 +66,11 @@ def build_factor_signals(
     rows: list[dict[str, Any]] = []
     for record in records:
         try:
-            formula = FactorFormula(record.formula)
-            series = compute_series(formula, candles, int(record.lookback_bars))
+            if record.formula == DSL_FORMULA and (
+                not record.discovery_state or dt.datetime.fromisoformat(record.discovery_state["active_until"]) < dt.datetime.now(dt.UTC)
+            ):
+                continue
+            series = factor_series(record, candles)
             valid_history = [float(v) for v in series[-80:] if v is not None and math.isfinite(float(v))]
             raw = series[-1] if series else None
             if raw is None or not math.isfinite(float(raw)):

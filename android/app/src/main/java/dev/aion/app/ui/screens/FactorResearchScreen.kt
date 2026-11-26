@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewModelScope
 import dev.aion.app.AppContainer
 import dev.aion.app.data.ApiResult
 import dev.aion.app.data.EvaluationDto

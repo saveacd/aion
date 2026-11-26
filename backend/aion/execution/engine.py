@@ -23,12 +23,15 @@ from decimal import Decimal, InvalidOperation
 from typing import Any, Protocol
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from aion.exchange.errors import BinanceAPIError, ExchangeNetworkError, ExchangeTimeout
 from aion.exchange.symbols import SymbolRuleError, SymbolRules
 from aion.execution.state import (
     TERMINAL_STATES,
     OrderState,
+    can_transition,
     ensure_transition,
     from_exchange_status,
 )
@@ -156,7 +159,14 @@ class ExecutionEngine:
 
             order = self._build_order(intent, risk_decision, coid, attempt)
             session.add(order)
-            await session.flush()
+            try:
+                await session.flush()
+            except IntegrityError:
+                await session.rollback()
+                existing = await self._find_order(session, coid)
+                if existing is None:
+                    raise
+                return existing
 
             if not await self._validate(session, order, intent, rules):
                 await session.commit()
@@ -168,7 +178,9 @@ class ExecutionEngine:
             )
             order.submit_attempts = attempt
             order.submitted_at = _utcnow()
-            await session.flush()
+            # Persist the claim before the request can reach Binance. A second
+            # worker or a restarted process must query this ID, never resend it.
+            await session.commit()
 
             try:
                 ack = await self._client.new_order(
@@ -186,10 +198,18 @@ class ExecutionEngine:
                     position_side=order.position_side,
                 )
             except (ExchangeTimeout, ExchangeNetworkError) as exc:
+                if isinstance(session, AsyncSession):
+                    await session.refresh(order, with_for_update=True)
+                if _state_of(order) in TERMINAL_STATES:
+                    return order
                 ack = await self._confirm_after_ambiguous(
                     session, order, reason=exc.__class__.__name__
                 )
             except BinanceAPIError as exc:
+                if isinstance(session, AsyncSession):
+                    await session.refresh(order, with_for_update=True)
+                if _state_of(order) not in {OrderState.SUBMITTED, OrderState.UNKNOWN}:
+                    return order
                 await self._handle_api_error(session, order, exc)
                 await session.commit()
                 return order
@@ -198,6 +218,8 @@ class ExecutionEngine:
                 await session.commit()
                 return order
 
+            if isinstance(session, AsyncSession):
+                await session.refresh(order, with_for_update=True)
             await self._apply_ack(session, order, ack, event_type="EXCHANGE_ACK")
             await session.commit()
             return order
@@ -252,6 +274,7 @@ class ExecutionEngine:
             id=uuid.uuid4(),
             client_order_id=coid,
             intent_id=getattr(intent, "id", None),
+            user_id=getattr(intent, "user_id", None),
             risk_decision_id=getattr(risk_decision, "id", None),
             symbol=str(intent.symbol),
             side=str(intent.side).upper(),
@@ -325,8 +348,7 @@ class ExecutionEngine:
     def _absorb_ack(order: Order, ack: Any) -> None:
         order.exchange_order_id = getattr(ack, "order_id", None) or order.exchange_order_id
         filled = _as_decimal(getattr(ack, "executed_qty", None))
-        if filled >= D0:
-            order.filled_quantity = filled
+        order.filled_quantity = max(_as_decimal(order.filled_quantity), filled)
         avg_price = _as_decimal(getattr(ack, "avg_price", None))
         if avg_price > D0:
             order.avg_fill_price = avg_price
@@ -339,10 +361,35 @@ class ExecutionEngine:
     ) -> OrderState:
         self._absorb_ack(order, ack)
         target = from_exchange_status(getattr(ack, "status", None), fallback=OrderState.ACKNOWLEDGED)
-        if target is OrderState.UNKNOWN:
-            target = OrderState.ACKNOWLEDGED
+        if not can_transition(_state_of(order), target):
+            return _state_of(order)
         await self._transition(session, order, target, event_type)
         return target
+
+    async def recover_pending(self, *, user_id: uuid.UUID, mode: str) -> int:
+        """Resolve persisted submissions through exchange queries only."""
+        recoverable = {
+            OrderState.SUBMITTED, OrderState.UNKNOWN, OrderState.CANCEL_PENDING,
+            OrderState.ACKNOWLEDGED, OrderState.PARTIALLY_FILLED,
+        }
+        async with self._session_factory() as session:
+            ids = (await session.scalars(select(Order.id).where(
+                Order.user_id == user_id, Order.mode == mode,
+                Order.status.in_(tuple(recoverable)),
+            ).order_by(Order.updated_at.asc()).limit(100))).all()
+
+        resolved = 0
+        for order_id in ids:
+            async with self._session_factory() as session:
+                order = await session.get(Order, order_id, with_for_update=True)
+                if order is None or _state_of(order) not in recoverable:
+                    continue
+                ack = await self._confirm_after_ambiguous(session, order, "RECOVERY")
+                if ack is not None:
+                    state = await self._apply_ack(session, order, ack, event_type="RECOVERY_ACK")
+                    resolved += state not in (OrderState.UNKNOWN, OrderState.SUBMITTED, OrderState.CANCEL_PENDING)
+                await session.commit()
+        return resolved
 
     # -------------------------------------------------------------- cancel
     async def cancel(self, order: Order) -> Order:
@@ -379,7 +426,8 @@ class ExecutionEngine:
                     await self._transition(session, order, OrderState.CANCELED, "CANCEL_CONFIRMED")
             else:
                 self._absorb_ack(order, ack)
-                await self._transition(session, order, OrderState.CANCELED, "CANCEL_CONFIRMED")
+                target = OrderState.EXPIRED if mapped is OrderState.EXPIRED else OrderState.CANCELED
+                await self._transition(session, order, target, "CANCEL_CONFIRMED")
             await session.commit()
             return order
 

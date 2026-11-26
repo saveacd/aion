@@ -22,12 +22,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 logger = logging.getLogger(__name__)
 
-WS_BASE = "wss://fstream.binance.com/stream"
+WS_BASE = "wss://fstream.binance.com"
 FAPI = "https://fapi.binance.com"
 D = Decimal
 
 #: symbol -> {"price": Decimal, "change_pct": Decimal | None, "ts": datetime}
 _PRICES: dict[str, dict[str, Any]] = {}
+_EVENTS: dict[str, dict[str, dict[str, Any]]] = {}
 
 
 def latest_price(symbol: str) -> dict[str, Any] | None:
@@ -53,7 +54,8 @@ def all_prices() -> list[dict[str, Any]]:
 
 def _dec(value: Any) -> Decimal | None:
     try:
-        return D(str(value))
+        number = D(str(value))
+        return number if number.is_finite() else None
     except Exception:  # noqa: BLE001
         return None
 
@@ -107,36 +109,93 @@ async def _symbols(session_factory: async_sessionmaker[AsyncSession], base: Iter
     return wanted
 
 
+def _event_time(milliseconds: Any) -> dt.datetime:
+    return dt.datetime.fromtimestamp(int(milliseconds) / 1000, tz=dt.UTC)
+
+
+def _fresh(timestamp: dt.datetime, seconds: int) -> bool:
+    return -1 <= (dt.datetime.now(dt.UTC) - timestamp).total_seconds() <= seconds
+
+
+def _save_price(symbol: str, price: Decimal, change: Decimal | None, timestamp: dt.datetime) -> None:
+    current = _PRICES.get(symbol)
+    if price <= 0 or not _fresh(timestamp, 30) or (current and current["ts"] > timestamp):
+        return
+    if change is None and current:
+        change = current.get("change_pct")
+    _PRICES[symbol] = {"price": price, "change_pct": change, "ts": timestamp}
+
+
+def process_market_event(data: dict[str, Any]) -> None:
+    """Record a fresh, ordered public ticker or stream sample."""
+    event = data.get("e")
+    if event not in {"24hrTicker", "aggTrade", "depthUpdate", "forceOrder"}:
+        return
+    order = data.get("o") if event == "forceOrder" else None
+    symbol = str((order or data).get("s", "")).upper()
+    timestamp = _event_time(data["E"])
+    if not symbol or not _fresh(timestamp, 30):
+        return
+    if event == "24hrTicker":
+        price = _dec(data.get("c"))
+        if price is not None:
+            _save_price(symbol, price, _dec(data.get("P")), timestamp)
+        return
+
+    events = _EVENTS.setdefault(symbol, {})
+    current = events.get(event)
+    event_id = int(data["a"] if event == "aggTrade" else data.get("u", data["E"]))
+    if current and (timestamp < current["ts"] or event_id <= current["event_id"]):
+        return
+    values: dict[str, Any]
+    if event == "aggTrade":
+        price, quantity = _dec(data.get("p")), _dec(data.get("q"))
+        if price is None or quantity is None or min(price, quantity) <= 0:
+            return
+        values = {"price": str(price), "quantity": str(quantity), "buyer_is_maker": data.get("m")}
+        _save_price(symbol, price, None, timestamp)
+    elif event == "depthUpdate":
+        bids, asks = data["b"], data["a"]
+        if not bids or not asks:
+            return
+        bid, ask = _dec(bids[0][0]), _dec(asks[0][0])
+        if bid is None or ask is None or not 0 < bid < ask:
+            return
+        values = {"bids": bids, "asks": asks}
+    else:
+        values = {name: (order or {}).get(key) for name, key in (
+            ("side", "S"), ("average_price", "ap"), ("filled_quantity", "z"),
+        )}
+    events[event] = {"ts": timestamp, "event_id": event_id, **values}
+
+
+def recent_market_events(symbol: str) -> dict[str, dict[str, Any]]:
+    return {
+        kind: {key: value for key, value in event.items() if key != "ts"} | {"captured_at": event["ts"].isoformat()}
+        for kind, event in _EVENTS.get(symbol.upper(), {}).items()
+        if _fresh(event["ts"], 60 if kind == "forceOrder" else 10)
+    }
+
+
 async def _consume(symbols: set[str]) -> None:
+    async with asyncio.TaskGroup() as group:
+        group.create_task(_consume_route(symbols, "market", ("ticker", "aggTrade", "forceOrder")))
+        group.create_task(_consume_route(symbols, "public", ("depth10@500ms",)))
+
+
+async def _consume_route(symbols: set[str], route: str, topics: tuple[str, ...]) -> None:
     from websockets.asyncio.client import connect
 
-    streams = "/".join(f"{symbol.lower()}@ticker" for symbol in sorted(symbols))
-    url = f"{WS_BASE}?streams={streams}"
-    async with connect(
-        url,
-        ping_interval=20,
-        ping_timeout=20,
-        open_timeout=10,
-        max_size=4 * 1024 * 1024,
-    ) as ws:
+    streams = "/".join(f"{symbol.lower()}@{topic}" for symbol in sorted(symbols) for topic in topics)
+    url = f"{WS_BASE}/{route}/stream?streams={streams}"
+    async with connect(url, ping_interval=20, ping_timeout=20, open_timeout=10, max_size=4 * 1024 * 1024) as ws:
         async for raw in ws:
             try:
                 payload = json.loads(raw)
-                data = payload.get("data") or payload
-                symbol = str(data.get("s") or "").upper()
-                price = _dec(data.get("c"))
-                if not symbol or price is None:
-                    continue
-                change = _dec(data.get("P"))
-                event_ms = data.get("E")
-                ts = (
-                    dt.datetime.fromtimestamp(int(event_ms) / 1000, tz=dt.UTC)
-                    if event_ms
-                    else dt.datetime.now(dt.UTC)
-                )
-                _PRICES[symbol] = {"price": price, "change_pct": change, "ts": ts}
-            except Exception:  # noqa: BLE001, S112 - ignore malformed frames
+                process_market_event(payload.get("data") or payload)
+            except (ValueError, TypeError, KeyError, AttributeError, IndexError, OverflowError):
                 continue
+    raise ConnectionError(f"Binance {route} market stream closed")
 
 
 async def run_forever(
@@ -194,12 +253,8 @@ async def _poll_last_prices(client: httpx.AsyncClient, symbols: list[str]) -> bo
         price = _dec(data.get("price") if isinstance(data, dict) else None)
         if price is None:
             return
-        current = _PRICES.get(symbol) or {}
-        _PRICES[symbol] = {
-            "price": price,
-            "change_pct": current.get("change_pct"),
-            "ts": dt.datetime.now(dt.UTC),
-        }
+        ts = _event_time(data["time"]) if data.get("time") else dt.datetime.now(dt.UTC)
+        _save_price(symbol, price, None, ts)
 
     results = await asyncio.gather(*(one(s) for s in symbols), return_exceptions=True)
     errors = [str(r) for r in results if isinstance(r, BaseException)]
@@ -220,12 +275,12 @@ async def _poll_24h_stats(client: httpx.AsyncClient, symbols: list[str]) -> None
         change = _dec(data.get("priceChangePercent") if isinstance(data, dict) else None)
         if price is None:
             return
-        current = _PRICES.get(symbol) or {}
-        _PRICES[symbol] = {
-            "price": price,
-            "change_pct": change if change is not None else current.get("change_pct"),
-            "ts": dt.datetime.now(dt.UTC),
-        }
+        ts = _event_time(data["closeTime"]) if data.get("closeTime") else dt.datetime.now(dt.UTC)
+        current = _PRICES.get(symbol)
+        if current and current["ts"] > ts and change is not None:
+            current["change_pct"] = change
+        else:
+            _save_price(symbol, price, change, ts)
 
     results = await asyncio.gather(*(one(s) for s in symbols), return_exceptions=True)
     errors = [str(r) for r in results if isinstance(r, BaseException)]

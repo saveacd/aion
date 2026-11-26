@@ -189,6 +189,13 @@ fun MoreScreen(
                     )
                 }
                 Spacer(Modifier.height(10.dp))
+                NavTile(
+                    icon = Icons.Outlined.Science,
+                    title = "研究实验室",
+                    subtitle = "自主发现、独立验证与复算",
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { onNavigate("research-lab") },
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     NavTile(
                         icon = Icons.Outlined.Science,

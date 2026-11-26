@@ -12,6 +12,7 @@ import dataclasses
 import os
 import uuid
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -70,7 +71,7 @@ class ProviderConfig:
 
 
 async def resolve_provider_config(
-    db: AsyncSession, user_id: uuid.UUID
+    db: AsyncSession, user_id: uuid.UUID | None
 ) -> ProviderConfig | None:
     """Return the provider for ``user_id``.
 
@@ -78,9 +79,9 @@ async def resolve_provider_config(
     per-user assignment fall back to the first enabled provider so a newly
     registered account can use the six-agent analysis immediately.
     """
-    setting = (
-        await db.execute(select(UserModelSetting).where(UserModelSetting.user_id == user_id))
-    ).scalar_one_or_none()
+    setting = None
+    if user_id is not None:
+        setting = await db.scalar(select(UserModelSetting).where(UserModelSetting.user_id == user_id))
     if setting is not None and setting.enabled and setting.provider_id is not None:
         provider = await db.get(ModelProvider, setting.provider_id)
         if provider is None or not provider.is_enabled or not provider.api_key_enc:
@@ -276,6 +277,10 @@ async def build_inputs(
     strategy_id: uuid.UUID | None = None,
     intraday: bool | None = None,
     max_holding_minutes: int | None = None,
+    *,
+    mode: str = "PAPER",
+    public_only: bool = False,
+    market_research: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Assemble everything the agents may see. Missing data is declared, not filled."""
     snapshot = await db.scalar(
@@ -287,7 +292,14 @@ async def build_inputs(
     from aion.services.market_stream import fetch_live_klines, latest_price
 
     live_tick = latest_price(symbol)
-    live_bars = await fetch_live_klines(symbol, interval="1m", limit=60)
+    if live_tick and (
+        datetime.now(UTC) - live_tick["ts"]
+    ).total_seconds() > 15:
+        live_tick = None
+    live_bars = (
+        ((market_research["inputs"].get("realtime") or {}).get("live_1m") or [])
+        if market_research else await fetch_live_klines(symbol, interval="1m", limit=60)
+    )
     candle_rows = (
         await db.execute(
             select(MarketCandle)
@@ -323,24 +335,6 @@ async def build_inputs(
         .order_by(DerivativesSnapshot.captured_at.desc())
         .limit(1)
     )
-    account_stmt = select(AccountSnapshot).order_by(AccountSnapshot.captured_at.desc()).limit(1)
-    if user_id is not None:
-        account_stmt = (
-            select(AccountSnapshot)
-            .where(AccountSnapshot.user_id == user_id)
-            .order_by(AccountSnapshot.captured_at.desc())
-            .limit(1)
-        )
-    account = await db.scalar(account_stmt)
-    positions = []
-    if account is not None:
-        position_stmt = select(PositionSnapshot).where(
-            PositionSnapshot.captured_at == account.captured_at
-        )
-        if user_id is not None:
-            position_stmt = position_stmt.where(PositionSnapshot.user_id == user_id)
-        positions = (await db.execute(position_stmt)).scalars().all()
-
     closes = _series(candles, "close")
     highs = _series(candles, "high")
     lows = _series(candles, "low")
@@ -372,7 +366,62 @@ async def build_inputs(
             "atr14": _guarded(lambda: _tail(atr(htf_highs, htf_lows, htf_closes, 14))),
         }
 
-    ctx, limits = await build_context(db, symbol=symbol, mode="PAPER", user_id=user_id)
+    from aion.quant.factor_ensemble import detect_market_regime
+
+    market_regime = detect_market_regime(candles)
+    if public_only:
+        # This branch exits before any account, risk policy, or user data query.
+        return {
+            "symbol": symbol,
+            "interval": interval,
+            "market": {
+                "last_price": str(live_tick["price"] if live_tick else snapshot.last_price),
+                "captured_at": (live_tick["ts"] if live_tick else snapshot.captured_at).isoformat(),
+                "volume_24h": str(snapshot.volume_24h) if snapshot and snapshot.volume_24h is not None else None,
+            } if snapshot or live_tick else None,
+            "candles": {"count": len(candles), "recent": _recent_bars(candles)},
+            "higher_timeframe": {"indicators": htf_indicators, "recent": _recent_bars(htf_candles, 24)},
+            "realtime": {"last_price": str(live_tick["price"]), "live_1m": live_bars} if live_tick else None,
+            "indicators": indicators,
+            "market_regime": market_regime,
+            "derivatives": {
+                "captured_at": derivatives.captured_at.isoformat(),
+                "funding_rate": str(derivatives.funding_rate) if derivatives.funding_rate is not None else None,
+                "open_interest": str(derivatives.open_interest) if derivatives.open_interest is not None else None,
+                "basis_pct": str(derivatives.basis_pct) if derivatives.basis_pct is not None else None,
+            } if derivatives else None,
+        }
+
+    account_stmt = select(AccountSnapshot).where(AccountSnapshot.mode == mode).order_by(AccountSnapshot.captured_at.desc()).limit(1)
+    if user_id is not None:
+        account_stmt = (
+            select(AccountSnapshot)
+            .where(AccountSnapshot.user_id == user_id, AccountSnapshot.mode == mode)
+            .order_by(AccountSnapshot.captured_at.desc())
+            .limit(1)
+        )
+    account = await db.scalar(account_stmt)
+    positions = []
+    if account is not None:
+        position_stmt = select(PositionSnapshot).where(
+            PositionSnapshot.captured_at == account.captured_at, PositionSnapshot.mode == mode
+        )
+        if user_id is not None:
+            position_stmt = position_stmt.where(
+                PositionSnapshot.user_id == user_id
+            )
+        positions = (await db.execute(position_stmt)).scalars().all()
+
+    from aion.models.autopilot import LivePosition, PaperPosition
+
+    managed_positions = []
+    if user_id is not None:
+        position_model = PaperPosition if mode == "PAPER" else LivePosition
+        query = select(position_model).where(position_model.user_id == user_id, position_model.status == "OPEN")
+        if mode != "PAPER":
+            query = query.where(LivePosition.mode == mode)
+        managed_positions = (await db.scalars(query)).all()
+    ctx, limits = await build_context(db, symbol=symbol, mode=mode, user_id=user_id)
 
     learning: dict[str, Any] | None = None
     if user_id is not None:
@@ -407,9 +456,7 @@ async def build_inputs(
         ).scalars().all()
         factor_signals = build_factor_signals(active_factor_rows, candles)
 
-    from aion.quant.factor_ensemble import detect_market_regime
     from aion.quant.strategy_evolution import build_strategy_evolution
-    market_regime = detect_market_regime(candles)
     strategy_evolution = build_strategy_evolution(factor_signals, market_regime, learning)
 
     strategy_section: dict[str, Any] | None = None
@@ -503,7 +550,7 @@ async def build_inputs(
                 "source": "binance_live_ticker",
                 "live_1m": live_bars,
                 "live_1m_count": len(live_bars),
-                "note": "1 分钟 K 线直接来自 Binance，包含当前尚未收盘的 K 线；分析以这里的最后价格为基准。",
+                "note": "1 分钟 K 线直接来自 Binance，包含当前尚未收盘的 K 线；共享 K 线可能早于最新报价，请检查快照时间。",
             }
             if live_tick
             else None
@@ -550,6 +597,12 @@ async def build_inputs(
             if derivatives
             else None
         ),
+        "managed_positions": [
+            {"symbol": p.symbol, "side": p.position_side, "quantity": str(p.quantity),
+             "entry": str(p.entry_price), "stop_loss": str(p.stop_loss) if p.stop_loss else None,
+             "take_profit": str(p.take_profit) if p.take_profit else None}
+            for p in managed_positions if p.symbol == symbol
+        ],
         "account": (
             {
                 "equity_usd": str(account.total_wallet_balance),
@@ -570,11 +623,13 @@ async def build_inputs(
             else None
         ),
         "constraints": {
-            "mode": "PAPER",
+            "mode": mode,
             "max_leverage": limits.max_leverage,
             "max_position_notional_usd": str(limits.max_position_notional_usd),
             "max_total_exposure_usd": str(limits.max_total_exposure_usd),
             "required_stop_loss": limits.required_stop_loss,
+            "max_single_trade_loss_usd": str(limits.max_single_trade_loss_usd),
+            "daily_loss_limit_usd": str(limits.daily_loss_limit_usd),
             "allowed_symbols": list(ctx.allowed_symbols),
         },
         "learning": learning,
@@ -615,8 +670,22 @@ async def run_analysis(
     strategy_id: uuid.UUID | None = None,
     intraday: bool | None = None,
     max_holding_minutes: int | None = None,
+    mode: str = "PAPER",
+    market_research: dict[str, Any] | None = None,
 ) -> OrchestratorResult | None:
     """Execute one cycle end to end. Returns None when the run could not start."""
+    from aion.services.market_research import read_research
+
+    if market_research is None:
+        market_research = await read_research(symbol)
+    if market_research is None:
+        await DbRunRecorder(session_factory).finish_run(
+            run_id=run_id, verdict="NO_TRADE", confidence=None,
+            summary="暂无有效的共享市场研究，本次未调用模型。",
+            duration_ms=0, status="DEGRADED",
+        )
+        return None
+
     try:
         orchestrator = build_orchestrator(settings, session_factory, provider_config)
     except AgentProviderUnavailable:
@@ -631,12 +700,25 @@ async def run_analysis(
             strategy_id=strategy_id,
             intraday=intraday,
             max_holding_minutes=max_holding_minutes,
+            market_research=market_research,
+            mode=mode,
         )
 
+    inputs["market_research"] = {
+        "version": market_research["version"],
+        "as_of": market_research["as_of"],
+        "interval": market_research["inputs"]["interval"],
+        "order_book": market_research["inputs"].get("order_book"),
+    }
     ctx = AgentContext(symbol=symbol, interval=interval, run_id=run_id, inputs=inputs)
     try:
         return await asyncio.wait_for(
-            orchestrator.analyze(ctx), timeout=max(timeout_seconds, 30)
+            orchestrator.analyze(ctx, shared_research=market_research["conclusions"]), timeout=max(timeout_seconds, 30)
         )
     except TimeoutError:
+        await DbRunRecorder(session_factory).finish_run(
+            run_id=run_id, verdict="NO_TRADE", confidence=None,
+            summary="个人决策超时。", duration_ms=max(timeout_seconds, 30) * 1000,
+            status="DEGRADED",
+        )
         return None

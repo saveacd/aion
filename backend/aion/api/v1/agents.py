@@ -301,13 +301,14 @@ async def analyze(
 
     symbol = payload.symbol.upper()
     run_id = uuid.uuid4()
+    mode = settings.resolve_trading_mode().value
     recorder = DbRunRecorder(get_sessionmaker())
     await recorder.ensure_run(
         run_id=run_id,
         symbol=symbol,
         interval=payload.interval,
         trigger="manual",
-        mode=settings.resolve_trading_mode().value,
+        mode=mode,
         user_id=user.id,
     )
 
@@ -323,6 +324,7 @@ async def analyze(
                 timeout_seconds=settings.agent_run_timeout_seconds,
                 provider_config=provider_config,
                 user_id=user.id,
+                mode=mode,
             )
         except Exception as exc:  # noqa: BLE001 - recorded, never silently swallowed
             logger.exception("agent run %s failed", run_id)

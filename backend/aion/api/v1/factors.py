@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 import uuid
 from decimal import Decimal
@@ -9,15 +10,21 @@ from typing import Any
 
 from fastapi import APIRouter, Header, Query
 from pydantic import Field
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from aion.api.deps import CurrentUser, DbSession, SettingsDep
 from aion.core.db import get_sessionmaker
 from aion.core.errors import AppError, ErrorCode
 from aion.models.factors import FactorRecord
 from aion.models.market import MarketCandle
-from aion.models.research import FactorResearchTask, ResearchTaskLog, FactorValidationResult, FactorVersion, FactorLifecycleEvent
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
+from aion.models.research import (
+    FactorLifecycleEvent,
+    FactorResearchTask,
+    FactorValidationResult,
+    FactorVersion,
+    ResearchTaskLog,
+)
 from aion.schemas.common import AionModel
 from aion.services import factor_service
 from aion.services.agent_service import (
@@ -83,6 +90,8 @@ class FactorLibraryItem(AionModel):
     coverage: Decimal
     hypothesis: str
     status: str
+    expression: list[Any] | None = None
+    discovery_state: dict[str, Any] | None = None
     created_at: dt.datetime
 
 
@@ -310,7 +319,31 @@ async def list_factor_research_tasks(
         select(FactorResearchTask).where(FactorResearchTask.user_id == user.id)
         .order_by(FactorResearchTask.created_at.desc()).limit(limit)
     )).scalars().all()
-    return [FactorResearchTaskOut.model_validate(row) for row in rows]
+    summaries = []
+    for row in rows:
+        item = FactorResearchTaskOut.model_validate(row)
+        result = dict(item.result)
+        if dataset := result.get("dataset"):
+            result["dataset"] = {key: value for key, value in dataset.items() if key != "bars"}
+        if peers := result.get("peer_datasets"):
+            result["peer_datasets"] = {
+                symbol: {key: value for key, value in data.items() if key != "bars"}
+                for symbol, data in peers.items()
+            }
+        if evidence := result.get("discovery_library"):
+            result["discovery_library"] = [
+                {key: event[key] for key in ("factor_id", "status", "previous_status", "verdict")}
+                for event in evidence
+            ]
+        if discovery := result.get("discovery"):
+            candidates = discovery["candidates"]
+            result["discovery"] = {
+                **{key: value for key, value in discovery.items() if key != "candidates"},
+                "candidate_count": len(candidates),
+                "watch_count": sum(event["status"] == "WATCH" for event in (evidence or [])),
+            }
+        summaries.append(item.model_copy(update={"result": result}))
+    return summaries
 
 
 @router.get("/research/tasks/{task_id}", response_model=FactorResearchTaskOut)
@@ -321,6 +354,29 @@ async def get_factor_research_task(task_id: uuid.UUID, user: CurrentUser, db: Db
     if row is None:
         raise AppError(ErrorCode.NOT_FOUND, "Research task not found.")
     return FactorResearchTaskOut.model_validate(row)
+
+
+@router.post("/research/tasks/{task_id}/replay")
+async def replay_discovery(task_id: uuid.UUID, user: CurrentUser, db: DbSession):
+    """Recompute the archived discovery without changing library state."""
+    from aion.quant.factor_discovery import VERSION, discover
+    from aion.services.discovery_library import replay_evidence
+
+    row = await db.scalar(select(FactorResearchTask).where(
+        FactorResearchTask.id == task_id, FactorResearchTask.user_id == user.id,
+    ))
+    if row is None:
+        raise AppError(ErrorCode.NOT_FOUND, "Research task not found.")
+    stored = row.result.get("discovery")
+    dataset = row.result.get("dataset")
+    if not stored or not dataset or stored.get("algorithm_version") != VERSION:
+        raise AppError(ErrorCode.CONFLICT, "Archived run needs its original evaluator version.")
+    peers = row.result.get("peer_datasets") or {}
+    evidence = [item for item in row.result.get("discovery_library", []) if item.get("validation_request")]
+    recomputed = await asyncio.to_thread(discover, dataset, row.horizon_bars)
+    matched_evidence = await asyncio.to_thread(lambda: sum(replay_evidence(dataset, peers, item) for item in evidence))
+    return {"dataset_id": dataset["dataset_id"], "match": recomputed == stored and matched_evidence == len(evidence),
+            "algorithm_version": VERSION, "validation_runs": len(evidence), "matched_validation_runs": matched_evidence}
 
 
 @router.get("/research/tasks/{task_id}/logs", response_model=list[ResearchTaskLogOut])

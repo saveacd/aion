@@ -254,9 +254,19 @@ def test_reconcile_local_queries_are_scoped_by_user_and_mode() -> None:
     run(reconcile(FakeClient(), session, mode="TESTNET", user_id=user_id))
     sql = "\n".join(str(statement) for statement in session.statements)
     assert "orders.mode" in sql
-    assert "positions_snapshots.mode" in sql
+    assert "live_positions.mode" in sql
     assert "orders.user_id" in sql
-    assert "positions_snapshots.user_id" in sql
+    assert "live_positions.user_id" in sql
+
+
+def test_live_reconciliation_does_not_mistake_exchange_snapshots_for_local_ledger() -> None:
+    session = FakeSession(positions=[make_snapshot("0.5")])
+    client = FakeClient(positions=[make_position("0.5")])
+
+    result = run(reconcile(client, session, mode="TESTNET", user_id=uuid.uuid4()))
+
+    assert result.blocking is True
+    assert any(problem["kind"] == "unknown_exchange_position" for problem in result.differences)
 
 
 def test_user_reconcile_does_not_supersede_global_incidents() -> None:

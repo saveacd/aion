@@ -194,7 +194,7 @@ def test_submit_persists_events_and_quantizes() -> None:
     assert broker.new_order_calls == 1
     events = [obj.event_type for obj in session.added if isinstance(obj, OrderEvent)]
     assert events == ["VALIDATED", "SUBMIT_REQUEST", "EXCHANGE_ACK"]
-    assert session.commits == 1
+    assert session.commits == 2
 
 
 def test_timeout_queries_order_instead_of_resending() -> None:
@@ -401,3 +401,41 @@ def test_timeout_over_http_is_one_post_and_one_get() -> None:
     order_calls = [method for method, path in calls if path == "/fapi/v1/order"]
     assert order_calls == ["POST", "GET"]
     assert len(calls) == 2
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_restarted_worker_recovers_committed_submission_without_resending(trader_user):
+    from sqlalchemy import select
+
+    from aion.core.db import get_sessionmaker
+
+    factory = get_sessionmaker()
+    async with factory() as db:
+        intent = make_intent(user_id=trader_user.id)
+        db.add(intent)
+        await db.commit()
+
+    class InterruptedBroker(FakeBroker):
+        async def new_order(self, **params: Any) -> OrderAck:
+            # The local row must already be visible to a different connection.
+            async with factory() as db:
+                row = await db.scalar(select(Order).where(Order.client_order_id == params["client_order_id"]))
+                assert row is not None and row.status == "SUBMITTED"
+                assert row.user_id == trader_user.id
+            self.new_order_calls += 1
+            raise asyncio.CancelledError
+
+    broker = InterruptedBroker()
+    decision = make_decision()
+    with pytest.raises(asyncio.CancelledError):
+        await ExecutionEngine(broker, factory).submit(intent, decision, RULES)
+
+    broker.query_ack = broker._default_ack("FILLED")
+    resumed = ExecutionEngine(broker, factory)
+    assert await resumed.recover_pending(user_id=uuid.uuid4(), mode="TESTNET") == 0
+    assert await resumed.recover_pending(user_id=trader_user.id, mode="MAINNET") == 0
+    assert await resumed.recover_pending(user_id=trader_user.id, mode="TESTNET") == 1
+    result = await resumed.submit(intent, decision, RULES)
+    assert result.status == "FILLED"
+    assert broker.new_order_calls == 1
+    assert broker.query_calls == 1

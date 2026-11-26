@@ -158,8 +158,15 @@ class EntryPlanCandidate(BaseModel):
     expires_in_minutes: int = Field(default=240, ge=5, le=1440)
 
 
+class PositionAction(StrEnum):
+    HOLD = "HOLD"
+    REDUCE = "REDUCE"
+    CLOSE = "CLOSE"
+
+
 class ChiefDecisionOutput(AgentOutput):
     decision: Decision
+    position_action: PositionAction | None = None
     reason: str | None = None
     trade_intent: TradeIntentCandidate | None = None
     watch_plan: EntryPlanCandidate | None = None

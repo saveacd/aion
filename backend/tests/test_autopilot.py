@@ -190,7 +190,7 @@ async def test_autopilot_blocked_by_emergency_stop(settings, trader_user):
         assert cfg.last_error is not None and "EMERGENCY_STOP" in cfg.last_error
 
 
-async def test_autopilot_rejects_non_paper_execution_mode(settings, trader_user):
+async def test_autopilot_requires_explicit_migrated_live_authorization(settings, trader_user):
     async with get_sessionmaker()() as db:
         db.add(AutopilotConfig(
             user_id=trader_user.id, enabled=True, auto_execute=True,
@@ -203,7 +203,7 @@ async def test_autopilot_rejects_non_paper_execution_mode(settings, trader_user)
     async with get_sessionmaker()() as db:
         cfg = await db.get(AutopilotConfig, trader_user.id)
         assert cfg.last_error is not None
-        assert "仅允许 PAPER" in cfg.last_error
+        assert "持续实盘授权" in cfg.last_error
 
 
 async def test_autopilot_requires_provider(settings, trader_user, monkeypatch):
@@ -250,6 +250,58 @@ async def test_autopilot_api_confirm_gate(client, trader_user, login):
 
     # Disabling the pilot also disarms auto execution.
     response = await client.put("/api/v1/autopilot", headers=headers, json={"enabled": False})
+    assert response.json()["auto_execute"] is False
+
+
+async def test_live_authorization_persists_and_can_be_revoked(client, trader_user, login, monkeypatch, settings):
+    class FakeClient:
+        async def aclose(self):
+            pass
+
+    async def resolve(*args, **kwargs):
+        assert not kwargs["allow_operator_fallback"]
+        return FakeClient()
+
+    monkeypatch.setattr("aion.api.v1.autopilot.resolve_live_client", resolve)
+    monkeypatch.setattr(settings, "mainnet_enabled", True)
+    monkeypatch.setattr(settings, "require_totp_for_mainnet", True)
+    headers = await login("trader", "Aion-Trader-Passw0rd!")
+    url = "/api/v1/autopilot"
+    enable = {"enabled": True, "auto_execute": True, "confirm_auto_execute": True,
+              "execution_mode": "TESTNET", "max_trades_per_day": 0}
+    response = await client.put(url, headers=headers, json=enable)
+    assert response.status_code == 200, response.text
+    authorized_at = response.json()["live_authorized_at"]
+    assert authorized_at and response.json()["max_trades_per_day"] == 0
+
+    response = await client.put(url, headers=headers, json={"cycle_seconds": 300})
+    assert response.json()["live_authorized_at"] == authorized_at
+    mainnet_request = {**enable, "execution_mode": "MAINNET"}
+    response = await client.put(url, headers=headers, json=mainnet_request)
+    assert response.status_code == 409
+
+    import pyotp
+
+    from aion.core.crypto import SecretBox
+    from aion.models.auth import User
+
+    secret = pyotp.random_base32()
+    async with get_sessionmaker()() as db:
+        user = await db.get(User, trader_user.id)
+        user.totp_enabled = True
+        user.totp_secret_enc = SecretBox(settings).encrypt(secret)
+        await db.commit()
+    response = await client.put(
+        url, headers=headers, json={**mainnet_request, "totp_code": pyotp.TOTP(secret).now()}
+    )
+    assert response.status_code == 200, response.text
+    mainnet_authorized_at = response.json()["live_authorized_at"]
+    assert mainnet_authorized_at and mainnet_authorized_at != authorized_at
+    response = await client.put(url, headers=headers, json={"cycle_seconds": 420})
+    assert response.json()["live_authorized_at"] == mainnet_authorized_at
+
+    response = await client.put(url, headers=headers, json={"enabled": False})
+    assert response.json()["live_authorized_at"] is None
     assert response.json()["auto_execute"] is False
 
 
@@ -340,6 +392,10 @@ async def _seed_watch_plan(user_id, *, expires_in_minutes: int = 60) -> None:
 
 
 async def test_watch_plan_fires_when_price_enters_zone(monkeypatch, trader_user):
+    async def available_research(symbol):
+        return {"version": "test"}
+
+    monkeypatch.setattr("aion.services.autopilot.read_research", available_research)
     await _seed_watch_plan(trader_user.id)
     monkeypatch.setattr(
         "aion.services.autopilot.latest_price",
@@ -366,3 +422,58 @@ async def test_watch_plan_ignores_stale_or_expired_ticks(monkeypatch, trader_use
     async with get_sessionmaker()() as db:
         cfg = await db.get(AutopilotConfig, trader_user.id)
         assert cfg.watch_plans == []  # expired plan was dropped
+
+
+async def test_live_cycle_routes_authorized_testnet_intent_without_daily_cap(settings, trader_user, monkeypatch):
+    from types import SimpleNamespace
+
+    from test_orchestrator import CHIEF_TRADE
+
+    from aion.agents.schemas import TradeIntentCandidate
+    from aion.core.redis import get_redis
+
+    factory = get_sessionmaker()
+    marker = utcnow() - dt.timedelta(days=7)
+    async with factory() as db:
+        db.add(AutopilotConfig(
+            user_id=trader_user.id, enabled=True, auto_execute=True,
+            execution_mode="TESTNET", live_authorized_at=marker, symbols=["BTCUSDT"],
+            max_trades_per_day=0, trades_today=150, trades_today_date=utcnow().date(),
+        ))
+        await db.commit()
+
+    async def provider(*args):
+        return object()
+
+    async def research(symbol):
+        return {"version": str(trader_user.id), "as_of": utcnow().isoformat()}
+
+    async def analyze(**kwargs):
+        assert kwargs["mode"] == "TESTNET"
+        return SimpleNamespace(watch_plan=None, is_trade=True, confidence=0.9,
+                               trade_intent=TradeIntentCandidate.model_validate(CHIEF_TRADE["trade_intent"]))
+
+    async def risk(db, intent):
+        assert intent.mode == "TESTNET"
+        row = RiskDecision(intent_id=intent.id, user_id=intent.user_id, symbol=intent.symbol,
+                           mode=intent.mode, approved=True)
+        db.add(row)
+        await db.flush()
+        return row
+
+    async def execute(*args, **kwargs):
+        assert kwargs["mode"] == "TESTNET"
+        assert kwargs["intent"].user_id == trader_user.id
+        assert kwargs["decision"].approved
+        return SimpleNamespace(status="FILLED")
+
+    monkeypatch.setattr("aion.services.autopilot.resolve_provider_config", provider)
+    monkeypatch.setattr("aion.services.autopilot.read_research", research)
+    monkeypatch.setattr("aion.services.autopilot.run_analysis", analyze)
+    monkeypatch.setattr("aion.services.autopilot.evaluate_intent", risk)
+    monkeypatch.setattr("aion.services.autopilot.execute_live_entry", execute)
+    await run_user_cycle(factory, settings, trader_user.id)
+    async with factory() as db:
+        cfg = await db.get(AutopilotConfig, trader_user.id)
+        assert cfg.trades_today == 151 and cfg.live_authorized_at == marker
+    assert await get_redis().get(f"aion:mainnet:armed:{trader_user.id}") is None

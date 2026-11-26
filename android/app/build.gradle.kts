@@ -13,8 +13,8 @@ android {
         applicationId = "dev.aion.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 12
-        versionName = "0.2.12"
+        versionCode = 21600
+        versionName = "2.16.0"
 
         // BUG-26 fix: production default must be HTTPS and must be replaced with
         // the real production API host before releasing. Release builds use this

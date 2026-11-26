@@ -121,12 +121,8 @@ async def process_paper_sessions(session_factory: async_sessionmaker) -> int:
                 FactorRecord.interval == interval,
                 FactorRecord.status == "ACTIVE",
             ))).scalars().all()
-            if len(factors) < 2:
-                continue
             candles = as_backtest_candles(candles_rows)
             signals = _build_consensus(factors, candles)
-            if not signals:
-                continue
             kind = str(spec.get("strategy_kind", "trend_confirmation"))
             threshold = {"trend_confirmation": 0.18, "range_reversion": 0.22,
                          "high_volatility_defensive": 0.65}.get(kind, 1.0)

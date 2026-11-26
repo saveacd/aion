@@ -15,8 +15,8 @@ COMMON_RULES = """
 5. 引用任何数字都要能追溯到输入数据，并在 evidence 或 cited_inputs 中注明来源。
 6. 不确定时降低 confidence，并把不确定性写入 warnings；不要为了给出结论而过度自信。
 7. 输出必须精炼：summary 不超过 300 字；evidence 与 warnings 各不超过 4 条；不要逐条复述输入。
-8. 行情是实时数据：realtime.last_price 是当前最新成交价，realtime.live_1m 是最近 60 根 1 分钟 K 线
-   （最后一根可能尚未收盘）。判断入场、止损、止盈必须基于实时价格与 live_1m，而不是历史快照。
+8. 用 captured_at 和 market_research.as_of 判断行情和共享研究的时效。live_1m 可能包含未收盘 K 线。
+   判断当前入场应结合最新报价；不得把共享研究中的旧报价视为实时成交价。
 9. 输入中的 factor_signals 是用户因子库中已验证 ACTIVE 因子的实时计算结果；可以引用单因子与综合信号作为证据，
    但不得把因子信号当作下单指令、不得在缺失时编造，也不得绕过首席决策、对抗审查或风险引擎。
 """.strip()
@@ -56,6 +56,8 @@ STRATEGY_RESEARCH_PROMPT = f"""
 CHIEF_DECISION_PROMPT = f"""
 你是 AION 交易系统中的「首席交易决策 Agent」(Chief Trading Decision Agent)。
 职责：综合市场状态、技术面、衍生品、策略研究与对抗审查意见，输出 TRADE 或 NO_TRADE。
+- 如果 managed_positions 包含本交易对的持仓，必须选择 NO_TRADE，并给出 position_action（HOLD、REDUCE 或 CLOSE）及 reason。该动作只作为仓位建议。
+- 空仓时 position_action 必须为 null。全局研究带时间戳，使用最新报价和账户约束判断入场；共享 K 线截至快照生成时。
 - 选择 NO_TRADE 时必须给出明确 reason。
 - 选择 TRADE 时必须给出结构化 trade_intent 候选（仅提案，不代表授权或成交）。
 - 数据不足、信号冲突或置信度不足时应倾向 NO_TRADE。

@@ -9,7 +9,7 @@ from typing import Any
 
 from aion.quant.backtest import BacktestConfig, Candle, PositionState, Signal, run_backtest
 from aion.quant.factor_signals import normalize_factor_value
-from aion.quant.factors import FactorFormula, compute_series
+from aion.quant.factor_values import factor_series
 from aion.quant.strategy_score import evaluate_strategy
 
 
@@ -46,7 +46,7 @@ def as_backtest_candles(rows: Sequence[Any]) -> list[Candle]:
     return [Candle(
         open_time=row.open_time, open=Decimal(row.open), high=Decimal(row.high),
         low=Decimal(row.low), close=Decimal(row.close), volume=Decimal(row.volume),
-        interval_seconds=max(1, int((row.close_time - row.open_time).total_seconds())),
+        interval_seconds=max(1, round((row.close_time - row.open_time).total_seconds())),
     ) for row in rows]
 
 
@@ -57,8 +57,7 @@ def _build_consensus(records: Sequence[Any], candles: Sequence[Candle]) -> dict[
     weights: dict[datetime, float] = {}
     for record in records:
         try:
-            formula = FactorFormula(record.formula)
-            series = compute_series(formula, candles, int(record.lookback_bars))
+            series = factor_series(record, candles)
             # Equal weights avoid using IC/ICIR estimated on the full dataset
             # as hidden information inside the holdout period.
             weight = 1.0

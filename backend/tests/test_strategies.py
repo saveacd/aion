@@ -64,37 +64,38 @@ async def test_illegal_transition_is_conflict(client, auth_headers):
     assert "allowed" in response.json()["error"]["details"]
 
 
-async def test_lifecycle_reaches_active_with_version(client, auth_headers):
+async def test_lifecycle_reaches_active_with_version(client, auth_headers, login):
+    from conftest import _create_user
+
+    await _create_user("reviewer", "Aion-Reviewer-Passw0rd!", is_admin=True)
+    reviewer = await login("reviewer", "Aion-Reviewer-Passw0rd!")
+    policy = await client.put("/api/v1/risk/policy", headers=auth_headers, json={"max_leverage": 5})
+    assert policy.status_code == 200, policy.text
     strategy = await _create_strategy(client, auth_headers)
     strategy_id = strategy["id"]
-
     version = await client.post(
         f"/api/v1/strategies/{strategy_id}/versions",
-        json={"params": {"fast": 9}},
+        json={"params": {"fast": 9}, "risk_assumptions": {
+            "max_leverage": 2, "max_position_notional_usd": 500, "max_drawdown_pct": 5,
+            "stop_loss_pct": 2, "paper_max_drawdown_pct": 3, "paper_observation_days": 14,
+            "paper_trade_count": 30, "oos_passed": True, "paper_pnl_positive": True,
+            "funding_costs_included": True, "slippage_costs_included": True,
+        }},
         headers=auth_headers,
     )
+    assert version.status_code == 201, version.text
     version_id = version.json()["id"]
-
-    for state in ("BACKTEST", "PAPER", "SHADOW", "APPROVED"):
-        response = await client.post(
-            f"/api/v1/strategies/{strategy_id}/state",
-            json={"state": state, **({"version_id": version_id} if state == "APPROVED" else {})},
-            headers=auth_headers,
-        )
+    endpoint = f"/api/v1/strategies/{strategy_id}/state"
+    for state in ("BACKTEST", "PAPER", "SHADOW"):
+        response = await client.post(endpoint, json={"state": state}, headers=auth_headers)
         assert response.status_code == 200, response.text
 
-    blocked = await client.post(
-        f"/api/v1/strategies/{strategy_id}/state",
-        json={"state": "ACTIVE"},
-        headers=auth_headers,
-    )
-    assert blocked.status_code == 409
+    approval = {"state": "APPROVED", "version_id": version_id}
+    assert (await client.post(endpoint, json=approval, headers=auth_headers)).status_code == 403
+    reviewed = await client.post(endpoint, json=approval, headers=reviewer)
+    assert reviewed.status_code == 200, reviewed.text
 
-    activated = await client.post(
-        f"/api/v1/strategies/{strategy_id}/state",
-        json={"state": "ACTIVE", "version_id": version_id},
-        headers=auth_headers,
-    )
+    activated = await client.post(endpoint, json={"state": "ACTIVE", "version_id": version_id}, headers=auth_headers)
     assert activated.status_code == 200, activated.text
     assert activated.json()["state"] == "ACTIVE"
     assert activated.json()["active_version_id"] == version_id

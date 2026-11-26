@@ -158,6 +158,13 @@ interface AionApi {
     @GET("api/v1/factors/research/tasks")
     suspend fun researchTasks(): List<JsonElement>
 
+    @GET("api/v1/factors/research/tasks/{task_id}")
+    suspend fun researchTask(@Path("task_id") taskId: String): JsonObject
+
+    @POST("api/v1/factors/research/tasks/{task_id}/replay")
+    suspend fun replayResearch(@Path("task_id") taskId: String): JsonObject
+
+
     @POST("api/v1/factors/research/tasks")
     suspend fun enqueueResearchTask(@Body body: JsonObject): JsonElement
 

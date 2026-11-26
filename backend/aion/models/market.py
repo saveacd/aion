@@ -93,3 +93,26 @@ class DerivativesSnapshot(UUIDPrimaryKey, CreatedAt, Base):
     taker_buy_sell_ratio: Mapped[Decimal | None] = mapped_column(Numeric(20, 8))
     basis_pct: Mapped[Decimal | None] = mapped_column(Numeric(20, 8))
     data_available: Mapped[dict[str, Any]] = mapped_column(nullable=False, default=dict)
+
+
+class MarketCandleRevision(UUIDPrimaryKey, CreatedAt, Base):
+    """Previous and replacement versions of a finalized public candle."""
+
+    __tablename__ = "market_candle_revisions"
+    __table_args__ = (Index("ix_market_candle_revisions_lookup", "symbol", "interval", "open_time"),)
+
+    symbol: Mapped[str] = mapped_column(String(32), nullable=False)
+    interval: Mapped[str] = mapped_column(String(8), nullable=False)
+    open_time: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    previous: Mapped[dict[str, Any]] = mapped_column(nullable=False)
+    replacement: Mapped[dict[str, Any]] = mapped_column(nullable=False)
+
+
+class MarketFundingSettlement(CreatedAt, Base):
+    """Actual published USD-M funding settlement, distinct from ticker estimates."""
+
+    __tablename__ = "market_funding_settlements"
+
+    symbol: Mapped[str] = mapped_column(String(32), primary_key=True)
+    settled_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
+    rate: Mapped[Decimal] = mapped_column(Numeric(38, 12), nullable=False)

@@ -20,10 +20,11 @@ class OrderState(StrEnum):
     CANCEL_PENDING = "CANCEL_PENDING"
     CANCELED = "CANCELED"
     REJECTED = "REJECTED"
+    EXPIRED = "EXPIRED"
     UNKNOWN = "UNKNOWN"
 
 
-TERMINAL_STATES = frozenset({OrderState.FILLED, OrderState.CANCELED, OrderState.REJECTED})
+TERMINAL_STATES = frozenset({OrderState.FILLED, OrderState.CANCELED, OrderState.REJECTED, OrderState.EXPIRED})
 OPEN_STATES = frozenset(
     {
         OrderState.CREATED,
@@ -48,6 +49,7 @@ _TRANSITIONS: dict[OrderState, frozenset[OrderState]] = {
             OrderState.FILLED,
             OrderState.CANCEL_PENDING,
             OrderState.CANCELED,
+            OrderState.EXPIRED,
             OrderState.REJECTED,
             OrderState.UNKNOWN,
         }
@@ -58,6 +60,7 @@ _TRANSITIONS: dict[OrderState, frozenset[OrderState]] = {
             OrderState.FILLED,
             OrderState.CANCEL_PENDING,
             OrderState.CANCELED,
+            OrderState.EXPIRED,
             OrderState.REJECTED,
             OrderState.UNKNOWN,
         }
@@ -68,12 +71,14 @@ _TRANSITIONS: dict[OrderState, frozenset[OrderState]] = {
             OrderState.FILLED,
             OrderState.CANCEL_PENDING,
             OrderState.CANCELED,
+            OrderState.EXPIRED,
             OrderState.UNKNOWN,
         }
     ),
     OrderState.CANCEL_PENDING: frozenset(
         {
             OrderState.CANCELED,
+            OrderState.EXPIRED,
             OrderState.FILLED,
             OrderState.PARTIALLY_FILLED,
             OrderState.UNKNOWN,
@@ -82,6 +87,7 @@ _TRANSITIONS: dict[OrderState, frozenset[OrderState]] = {
     OrderState.FILLED: frozenset(),
     OrderState.CANCELED: frozenset(),
     OrderState.REJECTED: frozenset(),
+    OrderState.EXPIRED: frozenset(),
     # Recovery: after a successful post-hoc query we may land on any real state.
     OrderState.UNKNOWN: frozenset(
         {
@@ -92,6 +98,7 @@ _TRANSITIONS: dict[OrderState, frozenset[OrderState]] = {
             OrderState.FILLED,
             OrderState.CANCEL_PENDING,
             OrderState.CANCELED,
+            OrderState.EXPIRED,
             OrderState.REJECTED,
         }
     ),
@@ -105,8 +112,8 @@ _EXCHANGE_STATUS_MAP = {
     "CANCELED": OrderState.CANCELED,
     "PENDING_CANCEL": OrderState.CANCEL_PENDING,
     "REJECTED": OrderState.REJECTED,
-    "EXPIRED": OrderState.CANCELED,
-    "EXPIRED_IN_MATCH": OrderState.CANCELED,
+    "EXPIRED": OrderState.EXPIRED,
+    "EXPIRED_IN_MATCH": OrderState.EXPIRED,
 }
 
 

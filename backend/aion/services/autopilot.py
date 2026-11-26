@@ -27,6 +27,7 @@ import datetime as dt
 import logging
 import os
 import uuid
+from contextlib import suppress
 from decimal import Decimal
 from typing import Any
 
@@ -35,6 +36,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from aion.agents.base import DbRunRecorder
 from aion.core.config import Settings
+from aion.core.redis import get_redis
 from aion.execution.paper import PaperBroker
 from aion.models import (
     AgentRun,
@@ -52,8 +54,8 @@ from aion.services.learning import close_due_positions_and_record, maybe_distill
 from aion.services.live_trading import (
     LIVE_MODES,
     execute_live_entry,
-    resolve_live_client,
 )
+from aion.services.market_research import RESEARCH_MAX_AGE_SECONDS, read_research, recent
 from aion.services.market_stream import latest_price
 
 logger = logging.getLogger(__name__)
@@ -75,23 +77,37 @@ async def run_forever(
 ) -> None:
     tick_seconds = int(os.environ.get("AION_AUTOPILOT_TICK_SECONDS", str(DEFAULT_TICK_SECONDS)))
     logger.info("autopilot loop started (tick=%ss)", tick_seconds)
+    protection_task = asyncio.create_task(
+        _run_protection_forever(session_factory, settings, tick_seconds)
+    )
+    try:
+        while True:
+            try:
+                await tick_once(session_factory, settings)
+            except Exception:
+                logger.exception("autopilot tick failed")
+            await asyncio.sleep(tick_seconds)
+    finally:
+        protection_task.cancel()
+        await asyncio.gather(protection_task, return_exceptions=True)
+
+
+async def _run_protection_forever(
+    session_factory: async_sessionmaker[AsyncSession], settings: Settings, tick_seconds: int,
+) -> None:
     while True:
         try:
-            await tick_once(session_factory, settings)
-        except asyncio.CancelledError:
-            raise
-        except Exception:  # noqa: BLE001 - the loop must survive a bad tick
-            logger.exception("autopilot tick failed")
+            closed = await close_due_positions_and_record(session_factory, settings)
+            if closed:
+                logger.info("autopilot: closed %s due paper position(s)", closed)
+        except Exception:
+            logger.exception("autopilot paper protection sweep failed")
         await asyncio.sleep(tick_seconds)
 
 
 async def tick_once(
     session_factory: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
-    closed = await close_due_positions_and_record(session_factory, settings)
-    if closed:
-        logger.info("autopilot: closed %s due paper position(s)", closed)
-
     # AI 等待区：价格进入计划区间时立即重新分析（不等周期）。
     triggered = await _consume_watch_triggers(session_factory)
 
@@ -106,28 +122,29 @@ async def tick_once(
         ]
 
     now = utcnow()
-    for user_id, last_run_at, cycle_seconds in snapshot:
-        focus = triggered.get(user_id)
-        if focus is None and last_run_at is not None:
-            due_at = last_run_at + dt.timedelta(seconds=max(cycle_seconds, MIN_CYCLE_SECONDS))
-            if due_at > now:
-                continue
-        lock_ttl = max(int(cycle_seconds), MIN_CYCLE_SECONDS, LOCK_MIN_TTL_SECONDS)
-        lock_token = uuid.uuid4().hex
-        if not await _acquire_cycle_lock(user_id, lock_ttl, lock_token):
-            # Another worker instance owns this user's cycle right now
-            # (follow-up audit #3 — multi-replica deployments must not
-            # double-fire; the TTL covers worst-case model latency too).
-            continue
-        cycle_task = asyncio.create_task(
-            _run_locked_user_cycle(session_factory, settings, user_id, focus, lock_ttl, lock_token)
-        )
-        try:
-            await cycle_task
-        except LockLeaseLost:
-            logger.error("autopilot cycle stopped after lock lease loss user=%s", user_id)
-        finally:
-            await _release_cycle_lock(user_id, lock_token)
+    concurrency = asyncio.Semaphore(max(1, settings.agent_max_concurrency))
+
+    async def run_due_user(user_id: uuid.UUID, cycle_seconds: int) -> None:
+        async with concurrency:
+            lock_ttl = max(cycle_seconds, LOCK_MIN_TTL_SECONDS)
+            token = uuid.uuid4().hex
+            if not await _acquire_cycle_lock(user_id, lock_ttl, token):
+                return
+            try:
+                await _run_locked_user_cycle(
+                    session_factory, settings, user_id, triggered.get(user_id), lock_ttl, token
+                )
+            except Exception:
+                logger.exception("autopilot cycle failed for user=%s", user_id)
+            finally:
+                await _release_cycle_lock(user_id, token)
+
+    await asyncio.gather(*(
+        run_due_user(user_id, cycle_seconds)
+        for user_id, last_run_at, cycle_seconds in snapshot
+        if user_id in triggered or last_run_at is None
+        or last_run_at + dt.timedelta(seconds=max(cycle_seconds, MIN_CYCLE_SECONDS)) <= now
+    ))
 
 
 class LockLeaseLost(RuntimeError):
@@ -151,24 +168,18 @@ async def _run_locked_user_cycle(
         done, _ = await asyncio.wait({work, heartbeat}, return_when=asyncio.FIRST_COMPLETED)
         if heartbeat in done and lost.is_set():
             work.cancel()
-            try:
+            with suppress(asyncio.CancelledError):
                 await work
-            except asyncio.CancelledError:
-                pass
             raise LockLeaseLost(f"Autopilot lease lost for user {user_id}")
         await work
     finally:
         heartbeat.cancel()
-        try:
+        with suppress(asyncio.CancelledError):
             await heartbeat
-        except asyncio.CancelledError:
-            pass
         if not work.done():
             work.cancel()
-            try:
+            with suppress(asyncio.CancelledError):
                 await work
-            except asyncio.CancelledError:
-                pass
 
 
 async def _do_user_cycle(
@@ -185,8 +196,6 @@ async def _renew_cycle_lock_forever(
     user_id: uuid.UUID, token: str, ttl_seconds: int, lost: asyncio.Event
 ) -> None:
     """Renew the Redis lease only while this worker still owns its token."""
-    from aion.core.redis import get_redis
-
     interval = max(5, ttl_seconds // 3)
     while True:
         await asyncio.sleep(interval)
@@ -218,8 +227,6 @@ async def _acquire_cycle_lock(user_id: uuid.UUID, ttl_seconds: int, token: str) 
     single-instance dev deployments (follow-up audit #3).
     """
     try:
-        from aion.core.redis import get_redis
-
         return bool(
             await get_redis().set(
                 f"aion:autopilot:lock:{user_id}", token, nx=True, ex=ttl_seconds
@@ -232,9 +239,7 @@ async def _acquire_cycle_lock(user_id: uuid.UUID, ttl_seconds: int, token: str) 
 
 async def _release_cycle_lock(user_id: uuid.UUID, token: str) -> None:
     """Compare-and-delete: only the holder releases, never another replica."""
-    try:
-        from aion.core.redis import get_redis
-
+    with suppress(Exception):
         await get_redis().eval(
             "if redis.call('get', KEYS[1]) == ARGV[1] then "
             "return redis.call('del', KEYS[1]) else return 0 end",
@@ -242,8 +247,6 @@ async def _release_cycle_lock(user_id: uuid.UUID, token: str) -> None:
             f"aion:autopilot:lock:{user_id}",
             token,
         )
-    except Exception:  # noqa: BLE001, S110 - TTL expires on its own anyway
-        pass
 
 
 async def _consume_watch_triggers(
@@ -265,6 +268,7 @@ async def _consume_watch_triggers(
         now = utcnow()
         triggered: dict[uuid.UUID, set[str]] = {}
         changed = False
+        research_ready: dict[str, bool] = {}
         for cfg in configs:
             plans = list(cfg.watch_plans or [])
             if not plans:
@@ -293,6 +297,11 @@ async def _consume_watch_triggers(
                     if fresh and low * (1 - ENTRY_ZONE_BUFFER) <= price <= high * (
                         1 + ENTRY_ZONE_BUFFER
                     ):
+                        if symbol not in research_ready:
+                            research_ready[symbol] = await read_research(symbol) is not None
+                        if not research_ready[symbol]:
+                            keep.append(plan)
+                            continue
                         triggered.setdefault(cfg.user_id, set()).add(symbol)
                         changed = True
                         logger.info(
@@ -433,36 +442,36 @@ async def run_user_cycle(
             await db.commit()
             return
         today = utcnow().date()
-        if cfg.trades_today_date != today:
-            cfg.trades_today = 0
-            cfg.trades_today_date = today
-        cfg.last_run_at = utcnow()  # claim the slot; prevents overlapping runs
-        await db.commit()
         symbols = [str(s).upper() for s in (cfg.symbols or []) if str(s).strip()]
         if focus_symbols is not None:
             # watch-plan trigger: only re-analyze the symbol(s) that reached the zone
             symbols = [s for s in symbols if s in focus_symbols]
             if not symbols:
                 return
+        if (
+            focus_symbols is None and cfg.last_run_at is not None
+            and cfg.last_run_at + dt.timedelta(seconds=max(cfg.cycle_seconds, MIN_CYCLE_SECONDS)) > utcnow()
+        ):
+            return
         interval = cfg.interval
         auto_execute = cfg.auto_execute
         min_confidence = float(cfg.min_confidence)
         strategy_id = cfg.strategy_id
-        trades_left = max(0, cfg.max_trades_per_day - cfg.trades_today)
+        trades_today = cfg.trades_today if cfg.trades_today_date == today else 0
+        trades_left = None if cfg.max_trades_per_day == 0 else max(0, cfg.max_trades_per_day - trades_today)
         mode = cfg.execution_mode or "PAPER"
+        if mode in LIVE_MODES and auto_execute and cfg.live_authorized_at is None:
+            cfg.last_error = "请在托管设置中重新确认持续实盘授权。"
+            await db.commit()
+            return
         intraday = bool(cfg.intraday)
         max_holding_minutes = int(cfg.max_holding_minutes or 240)
 
-    # This build's unattended autopilot is deliberately PAPER-only.  Keep the
-    # guard here (before provider lookup or any exchange-client construction)
-    # so a stale database setting cannot silently route an autonomous cycle to
-    # an exchange account.  The live execution modules remain separate, but
-    # they are not reachable from this autopilot path.
-    if mode != "PAPER":
-        await _set_error(
-            session_factory, user_id,
-            f"当前自动驾驶构建仅允许 PAPER 模拟模式；检测到 {mode}，本轮已安全停止。",
-        )
+    if mode != "PAPER" and mode not in LIVE_MODES:
+        await _set_error(session_factory, user_id, f"不支持的交易模式：{mode}")
+        return
+    if mode == "MAINNET" and not settings.mainnet_enabled:
+        await _set_error(session_factory, user_id, "主网交易未在服务器解锁。")
         return
 
     if not symbols:
@@ -473,11 +482,27 @@ async def run_user_cycle(
         provider = await resolve_provider_config(db, user_id)
     if provider is None and not (settings.anthropic_api_key or settings.openai_api_key):
         await _set_error(
-            session_factory,
-            user_id,
-            "未配置大模型 API：请在模型 Provider 页面添加密钥，或设置 AION_ANTHROPIC_API_KEY",
+            session_factory, user_id, "未配置大模型 API，请在模型 Provider 页面添加密钥。",
         )
         return
+
+    snapshots = {symbol: await read_research(symbol) for symbol in symbols}
+    if not any(snapshots.values()):
+        return
+    async with session_factory() as db:
+        cfg = await db.get(AutopilotConfig, user_id)
+        if cfg is None or not cfg.enabled or (cfg.execution_mode or "PAPER") != mode:
+            return
+        auto_execute = cfg.auto_execute
+        if mode in LIVE_MODES and auto_execute and cfg.live_authorized_at is None:
+            cfg.last_error = "请在托管设置中重新确认持续实盘授权。"
+            await db.commit()
+            return
+        cfg.last_run_at = utcnow()
+        if cfg.trades_today_date != today:
+            cfg.trades_today = 0
+            cfg.trades_today_date = today
+        await db.commit()
 
     broker = PaperBroker(session_factory)
     if mode == "PAPER":
@@ -485,8 +510,9 @@ async def run_user_cycle(
     last_error: str | None = None
 
     for symbol in symbols:
-        if trades_left <= 0:
-            break
+        research = snapshots[symbol]
+        if not research or not recent(research["as_of"], max_age=RESEARCH_MAX_AGE_SECONDS):
+            continue
         try:
             placed = await _analyze_symbol(
                 session_factory=session_factory,
@@ -499,16 +525,22 @@ async def run_user_cycle(
                 mode=mode,
                 min_confidence=min_confidence,
                 auto_execute=auto_execute,
+                research=research,
+                allow_entry=trades_left is None or trades_left > 0,
+                watch_triggered=focus_symbols is not None,
                 strategy_id=strategy_id,
                 intraday=intraday,
                 max_holding_minutes=max_holding_minutes,
             )
-            if placed:
+            if placed and trades_left is not None:
                 trades_left -= 1
         except Exception as exc:  # noqa: BLE001 - one symbol must not kill the cycle
             logger.exception("autopilot cycle failed for user=%s symbol=%s", user_id, symbol)
             last_error = f"{symbol}: {type(exc).__name__}"
 
+    if not all(snapshots.values()) and last_error is None:
+        missing = ", ".join(symbol for symbol, research in snapshots.items() if research is None)
+        last_error = f"等待共享市场研究：{missing}"
     await _set_error(session_factory, user_id, last_error)
 
 
@@ -527,26 +559,26 @@ async def _analyze_symbol(
     strategy_id: uuid.UUID | None,
     intraday: bool = True,
     max_holding_minutes: int = 240,
+    research: dict[str, Any],
+    allow_entry: bool = True,
+    watch_triggered: bool = False,
 ) -> bool:
     """Analyze one symbol and maybe place one paper trade. Returns True when an
     order was filled."""
     async with session_factory() as db:
-        open_position = await db.scalar(
-            select(PaperPosition.id).where(
-                PaperPosition.user_id == user_id,
-                PaperPosition.symbol == symbol,
-                PaperPosition.status == "OPEN",
-            )
+        position_model = PaperPosition if mode == "PAPER" else LivePosition
+        position_query = select(position_model.id).where(
+            position_model.user_id == user_id, position_model.symbol == symbol,
+            position_model.status == "OPEN",
         )
-        if open_position is None:
-            open_position = await db.scalar(
-                select(LivePosition.id).where(
-                    LivePosition.user_id == user_id,
-                    LivePosition.symbol == symbol,
-                    LivePosition.status == "OPEN",
-                )
-            )
-    if open_position is not None:
+        if mode != "PAPER":
+            position_query = position_query.where(LivePosition.mode == mode)
+        open_position = await db.scalar(position_query.limit(1))
+    if open_position is None and not allow_entry:
+        return False
+    kind = str(open_position) if open_position else "watch" if watch_triggered else "entry"
+    key = f"aion:user-decision:{user_id}:{mode}:{symbol}:{interval}:{research['version']}:{kind}"
+    if not await get_redis().set(key, "1", nx=True, ex=RESEARCH_MAX_AGE_SECONDS):
         return False
 
     run_id = uuid.uuid4()
@@ -567,8 +599,13 @@ async def _analyze_symbol(
         strategy_id=strategy_id,
         intraday=intraday,
         max_holding_minutes=max_holding_minutes,
+        market_research=research,
+        mode=mode,
     )
-    if result is None:
+    if (
+        result is None or open_position is not None
+        or not recent(research["as_of"], max_age=RESEARCH_MAX_AGE_SECONDS)
+    ):
         return False
 
     # 日内抓点：AI 暂不入场但给出了等待区时，交给实时行情监视。
@@ -585,7 +622,12 @@ async def _analyze_symbol(
         return False
 
     candidate = result.trade_intent
+    if candidate.symbol != symbol:
+        return False
     async with session_factory() as db:
+        existing_position = await db.scalar(position_query.limit(1))
+        if existing_position is not None:
+            return False
         intent = TradeIntent(
             intent_key=f"auto-{run_id}",
             run_id=run_id,
@@ -657,10 +699,7 @@ async def _analyze_symbol(
                         mode=mode,
                     )
                 except PermissionError as exc:
-                    # MAINNET armed marker missing: skip this cycle, never
-                    # guess (audit #8).
-                    logger.warning("mainnet execution refused: %s", exc)
-                    await exec_db.rollback()
+                    logger.warning("live execution refused: %s", exc)
                     return False
                 if order is not None and order.status == "FILLED":
                     async with session_factory() as exec_db:

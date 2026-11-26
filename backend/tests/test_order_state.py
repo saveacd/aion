@@ -72,7 +72,7 @@ def test_exchange_status_mapping() -> None:
     assert from_exchange_status("NEW") is OrderState.ACKNOWLEDGED
     assert from_exchange_status("PARTIALLY_FILLED") is OrderState.PARTIALLY_FILLED
     assert from_exchange_status("FILLED") is OrderState.FILLED
-    assert from_exchange_status("EXPIRED") is OrderState.CANCELED
+    assert from_exchange_status("EXPIRED") is OrderState.EXPIRED
     assert from_exchange_status("SOMETHING_NEW") is OrderState.UNKNOWN
 
 

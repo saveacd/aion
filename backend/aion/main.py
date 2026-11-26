@@ -121,27 +121,31 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         init_engine(settings)
         init_client(settings)
         await _mark_orphaned_runs()
+        from aion.core.db import get_sessionmaker
+
         research_task: asyncio.Task[None] | None = None
         if os.environ.get("AION_RESEARCH_WORKER_ENABLED", "true").lower() not in ("false", "0", "off"):
-            from aion.core.db import get_sessionmaker
-            from aion.services.research_worker import recover_interrupted_tasks, run_forever as research_forever
+            from aion.services.research_worker import recover_interrupted_tasks
+            from aion.services.research_worker import run_forever as research_forever
 
             recovered = await recover_interrupted_tasks(get_sessionmaker())
             if recovered:
                 logger.warning("requeued %s stale factor research task(s)", recovered)
             research_task = asyncio.create_task(research_forever(get_sessionmaker(), settings))
+        from aion.services.market_research import research_symbols
+        from aion.services.market_research import run_forever as market_research_forever
+
+        market_research_task = asyncio.create_task(market_research_forever(get_sessionmaker(), settings))
         ingest_task: asyncio.Task[None] | None = None
         if os.environ.get("AION_INGEST_ENABLED", "true").lower() not in ("false", "0", "off"):
-            from aion.core.db import get_sessionmaker
             from aion.services.market_ingest import run_forever
 
             interval = int(os.environ.get("AION_INGEST_INTERVAL_SECONDS", "60"))
             ingest_task = asyncio.create_task(
-                run_forever(get_sessionmaker(), list(settings.default_symbols), interval)
+                run_forever(get_sessionmaker(), research_symbols(settings), interval)
             )
         autopilot_task: asyncio.Task[None] | None = None
         if os.environ.get("AION_AUTOPILOT_ENABLED", "true").lower() not in ("false", "0", "off"):
-            from aion.core.db import get_sessionmaker
             from aion.services.autopilot import run_forever as autopilot_forever
 
             autopilot_task = asyncio.create_task(
@@ -153,7 +157,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "0",
             "off",
         ):
-            from aion.core.db import get_sessionmaker
             from aion.services.live_trading import run_reconcile_forever
 
             reconcile_task = asyncio.create_task(
@@ -168,7 +171,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             # Real-time fills/cancels/protection triggers via Binance
             # user-data streams; REST reconcile stays the fallback
             # (follow-up audit #9).
-            from aion.core.db import get_sessionmaker
             from aion.services.live_trading import run_streams_forever
 
             user_stream_task = asyncio.create_task(
@@ -180,7 +182,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "0",
             "off",
         ):
-            from aion.core.db import get_sessionmaker
             from aion.services.market_stream import run_forever as stream_forever
 
             stream_task = asyncio.create_task(
@@ -192,6 +193,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             for task in (
                 research_task,
+                market_research_task,
                 ingest_task,
                 autopilot_task,
                 reconcile_task,

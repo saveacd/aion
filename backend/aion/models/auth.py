@@ -32,6 +32,7 @@ FEATURES_USER: tuple[str, ...] = (
     "autopilot",
     "learning",
     "factors",
+    "research-lab",
     "notifications",
     "exchange",
     "me",

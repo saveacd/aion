@@ -7,6 +7,7 @@
 <title>AION — 多智能体 AI 合约交易与量化研究系统</title>
 <meta name="description" content="AION 是面向个人研究与交易的多智能体加密货币合约系统，整合六 AI 协作、量化因子研究、独立风控与交易执行。默认 PAPER 模拟盘。">
 <style>
+#apkDownload[hidden]{display:none}
 :root{
   --bg:#100d0b;--bg2:#19120d;--panel:rgba(31,23,16,.88);--line:rgba(233,163,74,.22);
   --text:#fff4e8;--muted:#b7a38d;--violet:#d88a45;--blue:#d9a15f;--pink:#e9b47b;
@@ -161,7 +162,7 @@ footer{border-top-color:rgba(230,170,91,.2)}
       <p class="hero-copy">AION 是多智能体加密货币合约交易与量化研究系统。六个 AI 分工分析，确定性量化引擎负责因子计算与评估，独立风控审核交易意图，执行引擎负责订单与保护单。默认 PAPER 模拟盘；TESTNET 与 MAINNET 必须由你显式配置和授权。</p>
       <div class="hero-actions">
         <a class="btn" href="#download">下载 Android，立即开始</a>
-        <a class="btn secondary" href="#download">↓　下载 Android</a>
+        <a class="btn secondary" href="/ui/">打开 Web 控制台</a>
       </div>
       <div class="micro">默认模拟盘 · 逐根 K 线分析 · 日内模式 · 云端 24/7 巡检</div>
     </div>
@@ -188,7 +189,7 @@ footer{border-top-color:rgba(230,170,91,.2)}
     <div class="intro-panel">
       <div class="glass intro-copy reveal">
         <h3 style="font-size:25px;margin-top:0">面向大众，注册即用</h3>
-        <p>AION 采用 App 即全部的使用方式：下载 Android 客户端即可注册、开启托管、查看账户与持仓，无需接触任何服务器配置。每个用户的 API Key、策略、持仓与学习记录彼此隔离。系统围绕 Binance USDⓈ-M Futures 设计，账户、行情、策略、风险、订单与审计信息都在客户端内完成。</p>
+        <p>Android 客户端连接 AION 服务器后，可以登录、开启托管并查看账户与持仓。每个用户的 API Key、策略、持仓与学习记录彼此隔离。系统围绕 Binance USDⓈ-M Futures 设计，账户、行情、策略、风险、订单与审计信息都在客户端内完成。</p>
         <p>系统强调可解释、可追溯与安全边界：AI 负责分析并提交结构化交易意图；独立风控引擎负责审核；只有执行引擎可以向交易所提交订单。真实下单后立即挂保护单，云端持续巡检并自动平仓。</p>
         <div class="fact-row">
           <div class="fact"><b>6</b><span>协作 AI Agent</span></div>
@@ -251,14 +252,13 @@ footer{border-top-color:rgba(230,170,91,.2)}
 
 <section id="factor-lab">
   <div class="container">
-    <div class="section-head reveal"><div class="kicker">04 / FACTOR INTELLIGENCE</div><h3>让 AI 提出假设，让量化引擎负责验证。</h3><p class="lead">六个因子研究员围绕不同市场领域提出候选公式，确定性评估器使用历史 K 线计算 IC、ICIR、命中率与覆盖率。通过验证并处于 ACTIVE 的因子，会被实时信号引擎计算，并作为证据送入六 AI 决策上下文。</p></div>
+    <div class="section-head reveal"><div class="kicker">AION v2.16</div><h3>自主发现因子，独立验证结果。</h3><p class="lead">AION 生成并验证受限的因子表达式。你可以在 Web 控制台或 Android 研究实验室提交任务、查看验证记录并复算归档。</p></div>
     <div class="engine-grid">
-      <article class="glass engine reveal"><span class="num">01</span><h4>AI 因子挖掘</h4><p>研究员从 11 种白名单确定性公式中选择结构与参数，不能生成任意可执行代码。候选必须经过量化评估，未通过的不会进入有效因子集合。</p><div class="tags"><span class="tag">11 种公式</span><span class="tag">IC / ICIR</span><span class="tag">样本覆盖率</span></div></article>
-      <article class="glass engine reveal"><span class="num">02</span><h4>市场状态自适应组合</h4><p>根据已收盘 K 线识别趋势、震荡、高波动或未知状态，并对有效因子权重应用透明、有限的状态乘数。组合权重是可解释基线，不代表已训练出最优模型。</p><div class="tags"><span class="tag">TRENDING</span><span class="tag">RANGING</span><span class="tag">HIGH_VOLATILITY</span></div></article>
-      <article class="glass engine reveal"><span class="num">03</span><h4>因子生命周期</h4><p>对 ACTIVE / WATCH 因子重新检查近期样本外表现。信号衰退或方向反转时可降为 WATCH；通过后可重新激活。刷新由 API 显式触发。</p><div class="tags"><span class="tag">ACTIVE</span><span class="tag">WATCH</span><span class="tag">IC 复核</span></div></article>
-      <article class="glass engine reveal"><span class="num">04</span><h4>策略影子进化</h4><p>按市场状态提出策略研究方向，并参考已有 PAPER 交易结果形成复核建议。当前只输出 SHADOW_RESEARCH_ONLY 候选，不会自动改参数、风控限额或下单。</p><div class="tags"><span class="tag">Walk-forward</span><span class="tag">Fees / Slippage</span><span class="tag">No Auto Orders</span></div></article>
+      <article class="glass engine reveal"><h4>因子发现</h4><p>使用有界表达式、符号回归和遗传搜索生成候选，并保存可复算的数据版本。</p></article>
+      <article class="glass engine reveal"><h4>独立验证</h4><p>按资产、市场状态和时间分层验证。查看样本外 Rank IC、成本、流动性容量和组合增量。</p></article>
+      <article class="glass engine reveal"><h4>因子生命周期</h4><p>每次晋级、降级和退役都有样本与审计记录。只有在验证有效期内的 ACTIVE 因子会进入决策。</p></article>
+      <article class="glass engine reveal"><h4>持续托管</h4><p>在账户设置中授权后，服务端可持续运行。自动执行遵循账户权限、独立风控和急停开关。</p></article>
     </div>
-    <p class="micro" style="margin-top:18px">重要边界：因子信号是六 AI 的决策证据之一，不是独立交易指令；策略进化仍处于影子研究阶段。上线前应在 PAPER 与 Binance Testnet 中完成验证。</p>
   </div>
 </section>
 
@@ -334,9 +334,9 @@ footer{border-top-color:rgba(230,170,91,.2)}
     <div class="glass download reveal">
       <div class="kicker">09 / DOWNLOAD CENTER</div>
       <h3>现在就可以开始。</h3>
-      <p>下载 Android 客户端即可注册，注册后默认使用模拟盘，随时查看托管状态、持仓与每一笔交易记录。</p>
-      <a class="btn" href="/downloads/aion-debug.apk" download>↓　Android APK 下载</a>
-      <small id="downloadStatus">AION Android 调试版 · 直连官方服务器下载</small>
+      <p>AION Android v2.16 支持查看托管、持仓和交易记录，也可在研究实验室查看独立验证和复算归档。</p>
+      <a id="apkDownload" class="btn" href="/downloads/aion-debug.apk" download hidden>↓　Android APK 下载</a>
+      <small id="downloadStatus" role="status">此服务器暂未提供 APK。</small>
     </div>
   </div>
 </section>
@@ -362,7 +362,7 @@ const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entr
 document.querySelectorAll('.reveal').forEach(el=>observer.observe(el));
 fetch('/downloads/aion-debug.apk',{method:'HEAD'}).then(r=>{
   const n=Number(r.headers.get('content-length')||0);
-  if(r.ok&&n>0)document.getElementById('downloadStatus').textContent='AION Android 调试版 · '+(n/1048576).toFixed(1)+' MB · 直连官方服务器下载';
+  if(r.ok&&n>0){document.getElementById('apkDownload').hidden=false;document.getElementById('downloadStatus').textContent='AION Android v2.16 调试版 · '+(n/1048576).toFixed(1)+' MB';}
 }).catch(()=>{});
 </script>
 </body>

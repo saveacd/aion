@@ -21,7 +21,7 @@ from aion.exchange.orders import to_decimal
 
 D = Decimal
 
-WS_BASE_URL = "wss://fstream.binance.com/ws"
+WS_BASE_URL = "wss://fstream.binance.com/private/ws"
 
 
 class StreamError(ExchangeError):

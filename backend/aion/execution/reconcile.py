@@ -19,6 +19,7 @@ from sqlalchemy import select
 
 from aion.exchange.errors import ExchangeError
 from aion.models.account import PositionSnapshot, ReconciliationRun
+from aion.models.autopilot import LivePosition
 from aion.models.trading import Order
 
 D = Decimal
@@ -102,6 +103,13 @@ async def _latest_local_positions(
     return [row for row in latest.values() if _dec(row.quantity) != D0]
 
 
+async def _managed_live_positions(session: Any, user_id: uuid.UUID | None, mode: str) -> list[LivePosition]:
+    result = await session.execute(select(LivePosition).where(
+        LivePosition.mode == mode, LivePosition.user_id == user_id, LivePosition.status == "OPEN"
+    ))
+    return list(result.scalars().all())
+
+
 async def reconcile(
     client: Any,
     session: Any,
@@ -166,7 +174,13 @@ async def reconcile(
         return run
 
     local_orders = await _local_live_orders(session, user_id, mode)
-    local_positions = await _latest_local_positions(session, user_id, mode)
+    live_mode = mode in {"TESTNET", "MAINNET"}
+    # Exchange snapshots are observations. Comparing those same observations
+    # back to Binance would hide filled orders missing from the managed ledger.
+    local_positions = (
+        await _managed_live_positions(session, user_id, mode)
+        if live_mode else await _latest_local_positions(session, user_id, mode)
+    )
 
     exchange_by_client_id = {
         order.client_order_id: order for order in exchange_orders if order.client_order_id
@@ -250,8 +264,8 @@ async def reconcile(
                 differences.append(
                     Difference(
                         kind="position_quantity_mismatch",
-                        severity="WARN",
-                        blocking=False,
+                        severity="CRITICAL" if live_mode else "WARN",
+                        blocking=live_mode,
                         detail={
                             "symbol": key[0],
                             "position_side": key[1],

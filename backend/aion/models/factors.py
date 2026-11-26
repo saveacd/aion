@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Any
 
-from sqlalchemy import Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import Index, Integer, Numeric, String, Text, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from aion.models.base import Base, CreatedAt, OwnedMixin, UUIDPrimaryKey
@@ -16,6 +17,8 @@ class FactorRecord(OwnedMixin, UUIDPrimaryKey, CreatedAt, Base):
     __tablename__ = "factor_records"
     __table_args__ = (
         UniqueConstraint("user_id", "symbol", "interval", "factor_name", name="uq_factor_identity"),
+        Index("ix_factor_records_discovery_status", "user_id", "symbol", "interval", "status",
+              postgresql_where=text("expression IS NOT NULL")),
     )
 
     symbol: Mapped[str] = mapped_column(String(32), nullable=False)
@@ -33,6 +36,8 @@ class FactorRecord(OwnedMixin, UUIDPrimaryKey, CreatedAt, Base):
     coverage: Mapped[Decimal] = mapped_column(Numeric(6, 4), nullable=False)
     hypothesis: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="ACTIVE")
+    expression: Mapped[list[Any] | None] = mapped_column(nullable=True)
+    discovery_state: Mapped[dict[str, Any] | None] = mapped_column(nullable=True)
     run_id_text: Mapped[str] = mapped_column(String(64), nullable=False, default="")
 
 

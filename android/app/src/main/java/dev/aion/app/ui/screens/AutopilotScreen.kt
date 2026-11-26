@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewModelScope
 import dev.aion.app.AppContainer
@@ -117,6 +118,7 @@ fun AutopilotScreen(container: AppContainer) {
     var holdMinutes by remember { mutableStateOf("240") }
     var confirmExec by remember { mutableStateOf(false) }
     var mode by remember { mutableStateOf("PAPER") }
+    var liveTotp by remember { mutableStateOf("") }
 
     if (data != null && !initialized) {
         enabled = data.config.enabled
@@ -169,7 +171,16 @@ fun AutopilotScreen(container: AppContainer) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("PAPER" to "模拟盘", "TESTNET" to "测试网", "MAINNET" to "主网").forEach { (value, label) ->
                         OutlinedButton(
-                            onClick = { mode = value },
+                            onClick = {
+                                if (mode != value) {
+                                    if (autoExec && value != "PAPER") {
+                                        autoExec = false
+                                        confirmExec = true
+                                    }
+                                    liveTotp = ""
+                                    mode = value
+                                }
+                            },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.outlinedButtonColors(
                                 containerColor = if (mode == value) AionColors.Primary.copy(alpha = 0.16f) else AionColors.Bg,
@@ -185,7 +196,7 @@ fun AutopilotScreen(container: AppContainer) {
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("启用自动分析", style = MaterialTheme.typography.titleMedium)
-                        Text("按计划周期运行六 Agent 分析", style = MaterialTheme.typography.labelSmall, color = AionColors.Muted)
+                        Text("周期性复用全局市场研究并评估账户", style = MaterialTheme.typography.labelSmall, color = AionColors.Muted)
                     }
                     Switch(
                         checked = enabled,
@@ -256,7 +267,7 @@ fun AutopilotScreen(container: AppContainer) {
                     OutlinedTextField(
                         value = maxTrades,
                         onValueChange = { maxTrades = it.filter(Char::isDigit) },
-                        label = { Text("每日上限") },
+                        label = { Text("每日上限（0 不限）") },
                         modifier = Modifier.weight(1f),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -271,6 +282,19 @@ fun AutopilotScreen(container: AppContainer) {
                     )
                 }
                 Spacer(Modifier.height(12.dp))
+                if (mode == "MAINNET" && enabled && autoExec &&
+                    (data?.config?.liveAuthorizedAt == null || data.config.executionMode != mode)
+                ) {
+                    OutlinedTextField(
+                        value = liveTotp,
+                        onValueChange = { liveTotp = it.filter(Char::isDigit).take(8) },
+                        label = { Text("主网授权验证码") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        visualTransformation = PasswordVisualTransformation(),
+                    )
+                }
                 Button(
                     onClick = {
                         val symbolList = symbols.split(",").map { it.trim().uppercase() }
@@ -287,8 +311,10 @@ fun AutopilotScreen(container: AppContainer) {
                                 cycleSeconds = cycle.toIntOrNull(),
                                 maxTradesPerDay = maxTrades.toIntOrNull(),
                                 minConfidence = minConf.toDoubleOrNull(),
+                                totpCode = liveTotp.takeIf { it.isNotBlank() && mode == "MAINNET" },
                             ),
                         )
+                        liveTotp = ""
                     },
                     enabled = !saving,
                     modifier = Modifier.fillMaxWidth(),
@@ -310,7 +336,11 @@ fun AutopilotScreen(container: AppContainer) {
                     Spacer(Modifier.height(8.dp))
                     KeyValueRow("交易模式", data.config.tradingMode ?: "—")
                     KeyValueRow("上次运行", formatTime(data.config.lastRunAt), mono = false)
-                    KeyValueRow("今日已开仓", "${data.config.tradesToday} / ${data.config.maxTradesPerDay}")
+                    val cap = data.config.maxTradesPerDay
+                    KeyValueRow("今日已开仓", if (cap == 0) "${data.config.tradesToday} · 不限次数" else "${data.config.tradesToday} / $cap")
+                    if (data.config.executionMode != "PAPER") {
+                        KeyValueRow("持续托管授权", if (data.config.liveAuthorizedAt == null) "未授权" else "已授权", mono = false)
+                    }
                     KeyValueRow("今日已实现盈亏", fmtSignedUsd(data.todayRealizedPnlUsd))
                     KeyValueRow("累计已平仓", "${data.totalTrades} 笔")
                     data.config.lastError?.takeIf { it.isNotBlank() }?.let {
